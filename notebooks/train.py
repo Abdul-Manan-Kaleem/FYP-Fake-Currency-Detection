@@ -2,7 +2,6 @@ import tensorflow as tf
 from tensorflow.keras import layers, models
 from tensorflow.keras.applications import MobileNetV3Small
 import matplotlib.pyplot as plt
-
 # ====== PATH ======
 DATASET_PATH = "DataSet"
 
