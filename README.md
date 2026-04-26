@@ -55,8 +55,11 @@ FYP-Fake-Currency-Detection/
 To compile and execute a local copy of this software architecture, proceed with the following steps.
 
 ### Prerequisites
-Ensure the Flutter SDK and Python 3.10+ are installed and configured in your system path.
-* [Install Flutter Environment](https://docs.flutter.dev/get-started/install)
+**For Mobile App Development:**
+* [Flutter SDK](https://docs.flutter.dev/get-started/install) (Required to compile and run the mobile application).
+
+**For AI Model Training (Optional):**
+* Python 3.10+ (Only required if you are retraining the machine learning models inside the `/notebooks` or `/scripts` directories).
 
 ### Installation
 1. **Clone the repository:**
