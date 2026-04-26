@@ -11,12 +11,12 @@ This document details the architectural foundation, widget hierarchy, and core h
 * **Architecture Pattern:** Component-Driven Hierarchy (Separation of Views, Widgets, and Services)
 
 ## 3. Directory Structure and Modularity
-The codebase strictly avoids monolithic anti-patterns in favor of highly decoupled components. This mitigates layout-thrashing, encourages reusability, and establishes a highly scalable foundation for upcoming deep-learning integrations.
+The codebase strictly avoids monolithic anti-patterns in favor of a highly decoupled monorepo structure. By isolating the AI pipeline folders from the frontend, it establishes a highly scalable foundation for upcoming deep-learning integrations.
 
-* **`/lib/main.dart`**: Root entry point binding the native Flutter engine via `WidgetsFlutterBinding`.
-* **`/lib/screens/`**: Stateful layout wrappers responsible for distinct user journeys and route handling.
-* **`/lib/widgets/`**: Highly performant, reusable UI components decoupled from state layout layers.
-* **`/lib/services/`**: Pure Dart configuration files mapping external hardware interfaces.
+* **`/app/lib/main.dart`**: Root entry point binding the native Flutter engine via `WidgetsFlutterBinding`.
+* **`/app/lib/screens/`**: Stateful layout wrappers responsible for distinct user journeys and route handling.
+* **`/app/lib/widgets/`**: Highly performant, reusable UI components decoupled from state layout layers.
+* **`/app/lib/services/`**: Pure Dart configuration files mapping external hardware interfaces and AI image tensor modifications.
 
 ---
 
@@ -29,7 +29,14 @@ The codebase strictly avoids monolithic anti-patterns in favor of highly decoupl
 ### 4.2 Central System Routing
 * **Main Navigation (`main_navigation.dart`):** Actuates the primary interface via a central floating scanning trigger. Heavily leverages an `IndexedStack` to ensure that standard route states (such as navigating back to the dashboard) are kept alive, neutralizing arbitrary UI rebuilding.
 
-### 4.3 Hardware Interfacing (The Scanner Module)
+### 4.3 Image Pre-Processing & AI Engine
+* **Image Preprocessing Service (`image_preprocessing_service.dart`):** Abstracted math utility designed to crunch massive raw hardware image streams.
+  * *Exif Orientation:* Automatically forces correct rotational constraints on images.
+  * *Deep Tensor Crop:* Mathematically calculates the real-time screen-to-hardware ratio to perfectly crop the `290x155` alignment frame.
+  * *Pixel Normalization:* Synthetically boosts contrast by 25% and exposure by 10% to expose micro-patterns and UV boundaries specifically for Convolutional Neural Network processing.
+  * *Tensor Down-Sampling:* Uses linear interpolation to crunch the image into a `224x224` WxH footprint (the standard input matrix for TensorFlow/ImageNet models).
+
+### 4.4 Hardware Interfacing (The Scanner Module)
 The Scanner Module presents the heaviest technological architecture thus far, utilizing deep OS hardware ties and performance-restricted animation graphs.
 
 * **Scan Tab (`scan_tab.dart`):** The master orchestrator for the native camera. Employs a `CameraController` wrapped meticulously within a `WidgetsBindingObserver`.
