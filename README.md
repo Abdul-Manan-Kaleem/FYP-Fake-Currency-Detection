@@ -27,24 +27,27 @@ The Counter-feit Currency Detection System is architected leveraging professiona
 
 ## Code Structure
 
-The source code avoids single-file architecture monolithic patterns, strictly adhering to MVC-style separation of concerns mapped for production scalability. 
+This repository utilizes a professional **monorepo architecture** tailored for Machine Learning and Mobile App development. By segregating the AI pipeline from the mobile frontend, the project scales effortlessly and isolates development environments.
 
 ```text
-lib/
-├── main.dart                  # Root initialization bound to native engine
-├── models/                    # Data architecture & schemas
-├── screens/                   # Route Orchestrators
-│   ├── dashboard_tab.dart     # Analytic visualization
-│   ├── history_tab.dart       # User history logs
-│   ├── main_navigation.dart   # Core routing matrix & Scaffold
-│   ├── onboarding_screen.dart # Interactive introduction  
-│   ├── scan_tab.dart          # Heavy-lifting camera & hardware orchestrator
-│   └── splash_screen.dart     # System initialization
-├── services/                  # Application Business & Hardware Logic 
-│   └── image_picker_service.dart # Abstracted hardware interface
-└── widgets/                   # Stateless standalone UI modules
-    ├── camera_controls_bar.dart  # Centralized hardware manipulation triggers
-    └── scanner_overlay.dart      # High-performance Transform.translate animations
+FYP-Fake-Currency-Detection/
+├── app/                       # Flutter Mobile Application
+│   ├── lib/                   # Core Dart codebase (Screens, Widgets, Services)
+│   ├── pubspec.yaml           # Flutter dependencies
+│   └── android/ & ios/        # Native hardware bindings
+├── dataset/                   # Machine Learning Data
+│   ├── fake_currency/         # Scraped or generated counterfeit samples
+│   └── real_currency/         # High-resolution authentic samples
+├── model/                     # Exported ML Models
+│   ├── v1_model.tflite        # TensorFlow Lite models for on-device inference
+│   └── checkpoints/           # Model weight backups
+├── notebooks/                 # AI Training & Experiments
+│   ├── data_preprocessing.ipynb # Dataset augmentation notebooks
+│   └── cnn_training.ipynb     # Deep learning model training logic
+├── scripts/                   # Python Utility Scripts
+│   └── mass_resize.py         # Batch image normalizers
+└── docs/                      # Technical Documentation
+    └── Project_Documentation.md # Detailed architecture outlines
 ```
 
 ## Getting Started
@@ -52,7 +55,7 @@ lib/
 To compile and execute a local copy of this software architecture, proceed with the following steps.
 
 ### Prerequisites
-Ensure the Flutter SDK is installed and configured in your system path.
+Ensure the Flutter SDK and Python 3.10+ are installed and configured in your system path.
 * [Install Flutter Environment](https://docs.flutter.dev/get-started/install)
 
 ### Installation
@@ -60,9 +63,9 @@ Ensure the Flutter SDK is installed and configured in your system path.
    ```bash
    git clone https://github.com/Abdul-Manan-Kaleem/FYP-Fake-Currency-Detection.git
    ```
-2. **Navigate to the core project library:**
+2. **Navigate to the core Flutter project:**
    ```bash
-   cd FYP-Fake-Currency-Detection
+   cd FYP-Fake-Currency-Detection/app
    ```
 3. **Pull Package Dependencies:**
    ```bash
