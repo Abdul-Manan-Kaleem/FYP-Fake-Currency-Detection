@@ -87,8 +87,8 @@ To compile and execute a local copy of this software architecture, proceed with 
 - [ ] Instantaneous PKR Mapping & Matrix Veracity Plotting
 
 ---
-**Developer: ** Abdul Manan Kaleem
-**Model Training: ** Raja Waleed
-**Tester & Docementation: ** M. Usman
+*Developer:* Abdul Manan Kaleem
+*Model Training: * Raja Waleed
+*Tester & Docementation:* M. Usman
 *Final Year Project (FYP-1)*  
 *Department of Computer Science *
