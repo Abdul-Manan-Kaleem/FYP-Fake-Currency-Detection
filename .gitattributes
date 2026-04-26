@@ -1,0 +1,7 @@
+# Ignore Flutter auto-generated native platform folders for GitHub Language Stats
+app/android/** linguist-generated=true
+app/ios/** linguist-generated=true
+app/linux/** linguist-generated=true
+app/macos/** linguist-generated=true
+app/windows/** linguist-generated=true
+app/web/** linguist-generated=true
