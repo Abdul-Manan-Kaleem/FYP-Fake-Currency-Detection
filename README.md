@@ -39,11 +39,10 @@ FYP-Fake-Currency-Detection/
 │   ├── fake_currency/         # Scraped or generated counterfeit samples
 │   └── real_currency/         # High-resolution authentic samples
 ├── model/                     # Exported ML Models
-│   ├── v1_model.tflite        # TensorFlow Lite models for on-device inference
+│   ├── model.keras            # MobileNet v3 small using TensorFlow Lite to train model for on-device inference
 │   └── checkpoints/           # Model weight backups
 ├── notebooks/                 # AI Training & Experiments
-│   ├── data_preprocessing.ipynb # Dataset augmentation notebooks
-│   └── cnn_training.ipynb     # Deep learning model training logic
+│   └── train.py               # code for traing model
 ├── scripts/                   # Python Utility Scripts
 │   └── mass_resize.py         # Batch image normalizers
 └── docs/                      # Technical Documentation
