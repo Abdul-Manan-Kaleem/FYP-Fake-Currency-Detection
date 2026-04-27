@@ -35,6 +35,9 @@ This document is designed to help you prepare for your meeting with your FYP Sup
 
 # ❓ Supervisor Q&A (How to defend your work)
 
+**Supervisor:** *"Which third-party libraries/packages are you using, and why?"*
+**Your Answer:** "On the Frontend (Flutter), we strictly minimized third-party bloat. We use `camera` to interface natively with the hardware lenses without writing raw Android/iOS Java/Swift. We use `image_picker` to safely access the user's gallery permissions. Finally, we use the Dart `image` package to mathematically decode and manipulate raw pixels for the AI cropping and resizing. On the Backend (Python), we use `TensorFlow` and `Keras` to build the MobileNet v3 CNN because it supports exporting directly to `.tflite` for mobile execution."
+
 **Supervisor:** *"Why did you choose Flutter instead of Java/Kotlin or React Native?"*
 **Your Answer:** "We chose Flutter because its Skia rendering engine compiles directly to native ARM machine code, meaning it can process live 60-FPS camera streams without the JavaScript bridge bottleneck that React Native suffers from. It also allows us to write the UI once and deploy it to both Android and iOS seamlessly."
 
