@@ -47,5 +47,19 @@ This document is designed to help you prepare for your meeting with your FYP Sup
 **Supervisor:** *"If the camera is always running, won't this drain the user's battery and crash the phone?"*
 **Your Answer:** "No, sir. We implemented deep hardware lifecycle management using `WidgetsBindingObserver` and `TickerMode`. The literal nanosecond the user minimizes the app, or switches to the Dashboard tab, the camera isolate is completely shut down and flushed from RAM. It only streams when it is physically visible on the screen."
 
+**Supervisor:** *"How many classes have you used?"*
+**Your Answer:** *(Depends on what he means!)*
+* **If he means Machine Learning:** "We are training our Convolutional Neural Network on exactly **2 classes**: Class 0 (`Authentic`) and Class 1 (`Counterfeit`)."
+* **If he means OOP Code:** "We wrote approximately **22 Dart Classes** distributed across 12 files. We heavily separated our UI layer into classes like `ScanTab`, while keeping all mathematical logic strictly inside isolated Service classes like `ImagePreprocessingService`."
+
+**Supervisor:** *"How does your app handle the heavy time delay between capturing the 12-Megapixel image and processing the math without freezing the phone?"*
+**Your Answer:** "We utilized Dart's asynchronous `Future` and `async/await` methodology. The heavy image preprocessing is processed off the main UI thread. During this mathematical delay, we trigger a reactive `setState` overlay that shows a loading indicator. This guarantees the app never suffers from an 'Application Not Responding' (ANR) crash."
+
+**Supervisor:** *"Cameras use massive amounts of RAM. How do you prevent Out-Of-Memory (OOM) crashes on older phones?"*
+**Your Answer:** "We implemented aggressive garbage collection. When the camera isn't actively visible (like when switching tabs), we instantly destroy the `CameraController` using Flutter's `dispose()` lifecycle method. Furthermore, the `ImagePreprocessingService` instantly flushes the massive 12-Megapixel byte array from memory the exact millisecond it finishes cropping the `224x224` tensor."
+
+**Supervisor:** *"How are you planning to track the user's scan history?"*
+**Your Answer:** "We created a strict Data Schema called `ScanModel.dart`. Instead of passing loose strings around the app, every scan is instantiated into a highly typed object containing a `timestamp`, `confidenceScore`, and an `isAuthentic` boolean. This perfectly prepares the architecture for an SQLite or Firebase database injection in the next phase."
+
 **Supervisor:** *"Where is the actual Artificial Intelligence model right now?"*
 **Your Answer:** "The frontend architecture and the pre-processing mathematical pipeline are 100% complete. My team member, Raja Waleed, has just pushed the `model.keras` MobileNet v3 logic into our Monorepo's `/model` folder. Our next sprint is to convert that Keras model into a TensorFlow Lite `.tflite` file so we can run the inference natively on the mobile edge."
