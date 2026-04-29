@@ -51,7 +51,7 @@ FYP-Fake-Currency-Detection/
 
 ## Getting Started
 
-To compile and execute a local copy of this software architecture, proceed with the following steps.
+To compile and execute a local copy of this software architecture, follow these steps to set up, install, and run the project on your system
 
 ### Prerequisites
 **For Mobile App Development:**
