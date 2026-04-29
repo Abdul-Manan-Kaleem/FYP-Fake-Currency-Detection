@@ -35,7 +35,7 @@ FYP-Fake-Currency-Detection/
 │   ├── lib/                   # Core Dart codebase (Screens, Widgets, Services)
 │   ├── pubspec.yaml           # Flutter dependencies
 │   └── android/ & ios/        # Native hardware bindings
-├── Data-Set/                  # Machine Learning Data
+├── Data-Set/                  # Machine Learning data
 │   ├── fake_currency/         # Scraped or generated counterfeit samples
 │   └── real_currency/         # High-resolution authentic samples
 ├── model/                     # Exported ML Models
