@@ -87,7 +87,7 @@ To compile and execute a local copy of this software architecture, follow these 
 - [x] **AI Analysis UI Flow**: Implemented a simulated "Processing" screen with dynamic step-by-step progress, followed by a beautiful "Result" screen mapping passed/failed security features.
 - [ ] **Deep Learning Edge Integration**: Connecting the UI to the actual On-Device TensorFlow Lite model (`model.keras`).
 - [ ] **Instantaneous PKR Mapping & Matrix Veracity Plotting**: Real-time bounding box rendering over the live camera feed based on ML outputs.
-
+---
 #### *Supervisor:* M. Junaid Khan
 ---
 *Developer:* Abdul Manan Kaleem 
