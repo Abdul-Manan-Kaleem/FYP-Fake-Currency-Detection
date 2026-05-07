@@ -89,8 +89,12 @@ To compile and execute a local copy of this software architecture, follow these 
 - [ ] **Instantaneous PKR Mapping & Matrix Veracity Plotting**: Real-time bounding box rendering over the live camera feed based on ML outputs.
 
 ---
-*Developer:* Abdul Manan Kaleem
-*Model Training: * Raja Waleed
-*Tester & Docementation:* M. Usman
+*Developer:* Abdul Manan Kaleem 
+
+*Model Training: * Raja Waleed  
+
+*Testing & Docementation:* M. Usman  
+
 *Final Year Project (FYP-1)*  
+
 *Department of Computer Science**
