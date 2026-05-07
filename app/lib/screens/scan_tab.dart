@@ -5,6 +5,8 @@ import '../widgets/camera_controls_bar.dart';
 import '../services/image_picker_service.dart';
 import '../services/image_preprocessing_service.dart';
 import 'dart:typed_data';
+import 'processing_screen.dart';
+
 class ScanTab extends StatefulWidget {
   const ScanTab({super.key});
 
@@ -251,15 +253,36 @@ class _ScanTabState extends State<ScanTab> with WidgetsBindingObserver {
                       ),
                     ),
                     const SizedBox(height: 40),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white24,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text("Retake", style: TextStyle(fontSize: 16)),
-                      onPressed: () => setState(() => _capturedImageBytes = null),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white24,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text("Retake", style: TextStyle(fontSize: 16)),
+                          onPressed: () => setState(() => _capturedImageBytes = null),
+                        ),
+                        const SizedBox(width: 16),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                          icon: const Icon(Icons.analytics),
+                          label: const Text("Analyze AI", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const ProcessingScreen()),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -79,12 +79,14 @@ To compile and execute a local copy of this software architecture, follow these 
    ```
 *(Note: Ensure your physical deployment device has Camera Permissions injected into AndroidManifest.xml or Info.plist if triggering hardware features).*
 
-## Development Roadmap (AI Integrations)
-- [x] Initializing Core Scaffold and Tab Navigation
-- [x] Abstracting Platform Camera Streams & Deep UI Overlays
-- [x] Architectural Lifecycle Refactoring
-- [ ] Deep Learning Edge Integration (On-Device TensorFlow Lite model)
-- [ ] Instantaneous PKR Mapping & Matrix Veracity Plotting
+## Development Roadmap & Current Progress
+- [x] **Project Structure Setup**: Professional monorepo structure separating ML backend and Flutter frontend (`app/` directory).
+- [x] **Core Navigation UI**: Dashboard with Bottom Navigation Bar (Home, Scan, History).
+- [x] **Onboarding Flow**: Structured onboarding experience for first-time users.
+- [x] **Camera Integration**: Abstracted Platform Camera Streams & Deep UI Overlays with proper lifecycle management.
+- [x] **AI Analysis UI Flow**: Implemented a simulated "Processing" screen with dynamic step-by-step progress, followed by a beautiful "Result" screen mapping passed/failed security features.
+- [ ] **Deep Learning Edge Integration**: Connecting the UI to the actual On-Device TensorFlow Lite model (`model.keras`).
+- [ ] **Instantaneous PKR Mapping & Matrix Veracity Plotting**: Real-time bounding box rendering over the live camera feed based on ML outputs.
 
 ---
 *Developer:* Abdul Manan Kaleem
