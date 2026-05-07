@@ -91,7 +91,7 @@ To compile and execute a local copy of this software architecture, follow these 
 ---
 *Developer:* Abdul Manan Kaleem 
 
-*Model Training: * Raja Waleed  
+*Model Training:* Raja Waleed  
 
 *Testing & Docementation:* M. Usman  
 
