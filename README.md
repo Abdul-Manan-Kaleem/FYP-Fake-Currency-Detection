@@ -39,7 +39,7 @@ FYP-Fake-Currency-Detection/
 │   ├── fake_currency/         # Scraped or generated counterfeit samples
 │   └── real_currency/         # High-resolution authentic samples
 ├── model/                     # Exported ML Models
-│   ├── model.keras            # MobileNet v3 small using TensorFlow Lite to train model for on-device inference
+│   ├── currency_model.tflite  # MobileNet v3 small using TensorFlow Lite to train model for on-device inference
 │   └── checkpoints/           # Model weight backups
 ├── notebooks/                 # AI Training & Experiments
 │   └── train.py               # code for traing model
@@ -85,7 +85,7 @@ To compile and execute a local copy of this software architecture, follow these 
 - [x] **Onboarding Flow**: Structured onboarding experience for first-time users.
 - [x] **Camera Integration**: Abstracted Platform Camera Streams & Deep UI Overlays with proper lifecycle management.
 - [x] **AI Analysis UI Flow**: Implemented a simulated "Processing" screen with dynamic step-by-step progress, followed by a beautiful "Result" screen mapping passed/failed security features.
-- [ ] **Deep Learning Edge Integration**: Connecting the UI to the actual On-Device TensorFlow Lite model (`model.keras`).
+- [ ] **Deep Learning Edge Integration**: Connecting the UI to the actual On-Device TensorFlow Lite model (`currency_model.tflite`).
 - [ ] **Instantaneous PKR Mapping & Matrix Veracity Plotting**: Real-time bounding box rendering over the live camera feed based on ML outputs.
 ---
 #### *Supervisor:* M. Junaid Khan
