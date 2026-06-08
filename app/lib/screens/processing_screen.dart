@@ -108,6 +108,8 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
           builder: (context) => ResultScreen(
             isAuthentic: _result?.isAuthentic ?? false,
             confidenceScore: _result?.confidenceScore ?? 0.0,
+            frontImageBytes: widget.frontImageBytes,
+            backImageBytes: widget.backImageBytes,
           ),
         ),
       );

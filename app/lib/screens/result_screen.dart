@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
 class ResultScreen extends StatelessWidget {
   final bool isAuthentic;
   final double confidenceScore;
+  final Uint8List? frontImageBytes;
+  final Uint8List? backImageBytes;
 
   const ResultScreen({
     super.key,
     required this.isAuthentic,
     required this.confidenceScore,
+    this.frontImageBytes,
+    this.backImageBytes,
   });
 
   @override
@@ -26,31 +31,59 @@ class ResultScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 20),
-            // Result Icon with Animation
-            TweenAnimationBuilder(
-              duration: const Duration(milliseconds: 800),
-              tween: Tween<double>(begin: 0, end: 1),
-              builder: (context, double value, child) {
-                return Transform.scale(
-                  scale: value,
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: isAuthentic 
-                          ? Colors.green.withOpacity(0.1) 
-                          : Colors.red.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isAuthentic ? Icons.verified : Icons.warning_rounded,
-                      size: 100,
-                      color: isAuthentic ? Colors.green : Colors.redAccent,
-                    ),
+            const SizedBox(height: 10),
+            // Display the scanned image if available
+            if (frontImageBytes != null)
+              Container(
+                height: 220,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isAuthentic ? Colors.green : Colors.redAccent,
+                    width: 4,
                   ),
-                );
-              },
-            ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isAuthentic ? Colors.green : Colors.redAccent).withOpacity(0.4),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.memory(
+                    frontImageBytes!,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              )
+            else
+              // Fallback Icon
+              TweenAnimationBuilder(
+                duration: const Duration(milliseconds: 800),
+                tween: Tween<double>(begin: 0, end: 1),
+                builder: (context, double value, child) {
+                  return Transform.scale(
+                    scale: value,
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: isAuthentic 
+                            ? Colors.green.withOpacity(0.1) 
+                            : Colors.red.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isAuthentic ? Icons.verified : Icons.warning_rounded,
+                        size: 100,
+                        color: isAuthentic ? Colors.green : Colors.redAccent,
+                      ),
+                    ),
+                  );
+                },
+              ),
             const SizedBox(height: 32),
             // Title
             Text(
