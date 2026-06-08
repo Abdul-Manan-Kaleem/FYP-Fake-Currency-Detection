@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
-import '../widgets/scanner_overlay.dart';
-import '../widgets/camera_controls_bar.dart';
-import '../services/image_picker_service.dart';
-import '../services/image_preprocessing_service.dart';
+import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'dart:typed_data';
+import 'dart:io';
 import 'processing_screen.dart';
 
 class ScanTab extends StatefulWidget {
@@ -14,281 +11,186 @@ class ScanTab extends StatefulWidget {
   State<ScanTab> createState() => _ScanTabState();
 }
 
-class _ScanTabState extends State<ScanTab> with WidgetsBindingObserver {
-  CameraController? _cameraController;
-  List<CameraDescription>? _cameras;
-  
-  bool _isInit = false;
-  bool _isFlashOn = false;
-
+class _ScanTabState extends State<ScanTab> {
   bool _isProcessing = false;
-  Uint8List? _capturedImageBytes;
+  Uint8List? _frontImageBytes;
+  Uint8List? _backImageBytes;
 
-  final ImagePickerService _imagePickerService = ImagePickerService();
-  final ImagePreprocessingService _preprocessingService = ImagePreprocessingService();
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _initCamera();
-  }
-
-  Future<void> _initCamera() async {
+  Future<void> _startScanner() async {
+    setState(() => _isProcessing = true);
     try {
-      _cameras = await availableCameras();
-      if (_cameras != null && _cameras!.isNotEmpty) {
-        // Prioritize back camera for a proper scanning experience
-        final backCamera = _cameras!.firstWhere(
-          (c) => c.lensDirection == CameraLensDirection.back,
-          orElse: () => _cameras![0],
-        );
-
-        _cameraController = CameraController(
-          backCamera,
-          ResolutionPreset.high,
-          enableAudio: false,
-        );
-        
-        await _cameraController!.initialize();
-        if (mounted) {
-          setState(() {
-            _isInit = true;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Camera initialization error: $e");
-    }
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _cameraController?.dispose();
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return;
-    }
-    // Deep hardware cleanup: Avoid camera memory leaks and crashes if the app gets backgrounded
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
-      _cameraController?.dispose();
-      setState(() {
-        _isInit = false;
-      });
-    } else if (state == AppLifecycleState.resumed) {
-      // Reboot camera on foreground
-      if (_cameraController != null) {
-        _initCamera();
-      }
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // UX Performance Bug Fix: Pause background camera streaming when user navigates 
-    // to Dashboard or History tabs (since IndexedStack keeps tabs mounted under Offstage).
-    if (_cameraController != null && _cameraController!.value.isInitialized) {
-      final bool isVisible = TickerMode.of(context);
-      if (isVisible) {
-        _cameraController!.resumePreview().catchError((_) {});
-      } else {
-        _cameraController!.pausePreview().catchError((_) {});
-      }
-    }
-  }
-
-  Future<void> _toggleFlash() async {
-    if (_cameraController != null && _cameraController!.value.isInitialized) {
-      final newFlashState = !_isFlashOn;
-      await _cameraController!.setFlashMode(
-        newFlashState ? FlashMode.torch : FlashMode.off,
+      final options = DocumentScannerOptions(
+        documentFormats: const {DocumentFormat.jpeg},
+        mode: ScannerMode.filter,
+        pageLimit: 2,
+        isGalleryImport: true,
       );
-      setState(() {
-        _isFlashOn = newFlashState;
-      });
-    }
-  }
-
-  Future<void> _takePicture() async {
-    if (_cameraController != null && _cameraController!.value.isInitialized) {
-      if (_cameraController!.value.isTakingPicture || _isProcessing) return;
       
-      setState(() => _isProcessing = true);
-      try {
-        final XFile file = await _cameraController!.takePicture();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Processing Camera Image...'), duration: Duration(milliseconds: 1000)),
-          );
-        }
+      final documentScanner = DocumentScanner(options: options);
+      final DocumentScanningResult? result = await documentScanner.scanDocument();
 
-        final Uint8List? processedBytes = await _preprocessingService.processImageForAI(file);
-        
-        if (mounted) {
-          if (processedBytes != null) {
+      if (result != null && result.images != null && result.images!.isNotEmpty) {
+        if (result.images!.length == 2) {
+          final frontBytes = await File(result.images![0]).readAsBytes();
+          final backBytes = await File(result.images![1]).readAsBytes();
+          
+          if (mounted) {
             setState(() {
-              _capturedImageBytes = processedBytes;
+              _frontImageBytes = frontBytes;
+              _backImageBytes = backBytes;
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Image captured and tensor optimized! Ready for AI.'), backgroundColor: Colors.green),
+              const SnackBar(content: Text('Both sides successfully captured!'), backgroundColor: Colors.green),
             );
-          } else {
+          }
+        } else {
+          if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to process image.'), backgroundColor: Colors.red),
+              const SnackBar(content: Text('Please scan exactly 2 pages (Front and Back).'), backgroundColor: Colors.orange),
             );
           }
         }
-      } catch (e) {
-        debugPrint("Error taking picture: $e");
-      } finally {
-        if (mounted) setState(() => _isProcessing = false);
       }
-    }
-  }
-
-  Future<void> _pickFromGallery() async {
-    final XFile? image = await _imagePickerService.pickImageFromGallery();
-    if (image != null) {
-      setState(() => _isProcessing = true);
-      
+    } catch (e) {
+      debugPrint("Scanner error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Processing Gallery Image...'), duration: Duration(milliseconds: 1000)),
+          SnackBar(content: Text('Scanner error: $e'), backgroundColor: Colors.red),
         );
       }
-
-      final Uint8List? processedBytes = await _preprocessingService.processImageForAI(image);
-      
+    } finally {
       if (mounted) {
-        if (processedBytes != null) {
-          setState(() {
-            _capturedImageBytes = processedBytes;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Gallery Image mapped and optimized! Ready for AI.'), backgroundColor: Colors.green),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to process gallery image.'), backgroundColor: Colors.red),
-          );
-        }
+        setState(() => _isProcessing = false);
       }
-      
-      setState(() => _isProcessing = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInit || _cameraController == null) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
+      body: SafeArea(
+        child: _frontImageBytes != null && _backImageBytes != null
+            ? _buildResultsView()
+            : _buildStartView(),
+      ),
+    );
+  }
+
+  Widget _buildStartView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 1. Live Camera Feed
-          CameraPreview(_cameraController!),
-
-          // 2. Alignment Frame Component
-          ScannerOverlay(
-            width: 290,
-            height: 155,
-            borderColor: Theme.of(context).colorScheme.primary,
-          ),
-
-          // 3. User Controls Component
-          CameraControlsBar(
-            isFlashOn: _isFlashOn,
-            onGalleryTap: _pickFromGallery,
-            onShutterTap: _takePicture,
-            onFlashToggle: _toggleFlash,
-          ),
-          
-          // 4. Processing Overlay
-          if (_isProcessing)
-            Container(
-              color: Colors.black.withValues(alpha: 0.5),
-              child: const Center(
-                child: CircularProgressIndicator(color: Colors.cyan),
-              ),
+          const Icon(Icons.document_scanner, size: 80, color: Colors.cyan),
+          const SizedBox(height: 24),
+          const Text(
+            "Scan Currency Note",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
             ),
-            
-          // 5. Captured State Overlay
-          if (_capturedImageBytes != null)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.85),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.check_circle_outline_rounded, color: Colors.greenAccent, size: 80),
-                    const SizedBox(height: 20),
-                    const Text("IMAGE TAKEN", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                    const SizedBox(height: 10),
-                    const Text("Optimized and ready for AI analysis", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                    const SizedBox(height: 30),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.cyan, width: 2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.memory(_capturedImageBytes!, width: 224, height: 224, fit: BoxFit.cover),
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white24,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          icon: const Icon(Icons.refresh),
-                          label: const Text("Retake", style: TextStyle(fontSize: 16)),
-                          onPressed: () => setState(() => _capturedImageBytes = null),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          icon: const Icon(Icons.analytics),
-                          label: const Text("Analyze AI", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const ProcessingScreen()),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+          ),
+          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              "Our smart scanner will automatically detect edges and crop the note for you. Please scan both the Front and Back of the note in one go.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+          ),
+          const SizedBox(height: 40),
+          _isProcessing
+              ? const CircularProgressIndicator(color: Colors.cyan)
+              : ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text("Open Scanner"),
+                  onPressed: _startScanner,
                 ),
-              ),
-            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildResultsView() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.check_circle_outline_rounded, color: Colors.greenAccent, size: 80),
+        const SizedBox(height: 20),
+        const Text("IMAGES TAKEN", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2)),
+        const SizedBox(height: 10),
+        const Text("Both sides optimized and ready for AI analysis", style: TextStyle(color: Colors.white70, fontSize: 14)),
+        const SizedBox(height: 30),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildImageThumb(_frontImageBytes!),
+            const SizedBox(width: 16),
+            _buildImageThumb(_backImageBytes!),
+          ],
+        ),
+        const SizedBox(height: 40),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white24,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              icon: const Icon(Icons.refresh),
+              label: const Text("Retake All", style: TextStyle(fontSize: 16)),
+              onPressed: () => setState(() {
+                _frontImageBytes = null;
+                _backImageBytes = null;
+              }),
+            ),
+            const SizedBox(width: 16),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              icon: const Icon(Icons.analytics),
+              label: const Text("Analyze AI", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProcessingScreen(
+                      frontImageBytes: _frontImageBytes!,
+                      backImageBytes: _backImageBytes!,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageThumb(Uint8List bytes) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.cyan, width: 2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.memory(bytes, width: 140, height: 140, fit: BoxFit.cover),
       ),
     );
   }

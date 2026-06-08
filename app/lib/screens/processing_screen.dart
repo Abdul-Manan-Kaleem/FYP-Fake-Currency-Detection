@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 import 'result_screen.dart';
+import '../services/ml_service.dart';
+
 class ProcessingScreen extends StatefulWidget {
-  const ProcessingScreen({super.key});
+  final Uint8List frontImageBytes;
+  final Uint8List backImageBytes;
+
+  const ProcessingScreen({
+    super.key,
+    required this.frontImageBytes,
+    required this.backImageBytes,
+  });
 
   @override
   State<ProcessingScreen> createState() => _ProcessingScreenState();
@@ -9,6 +19,8 @@ class ProcessingScreen extends StatefulWidget {
 
 class _ProcessingScreenState extends State<ProcessingScreen> {
   int _currentStep = 0;
+  final MLService _mlService = MLService();
+  DetectionResult? _result;
   final List<String> _steps = [
     'Image Capture & Optimization',
     'Watermark Pattern Analysis',
@@ -24,9 +36,51 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
   }
 
   void _simulateProcess() async {
+    // 1. Initialize ML and run inference in the background
+    await _mlService.initialize();
+    
+    final frontResult = await _mlService.analyzeImage(widget.frontImageBytes);
+    final backResult = await _mlService.analyzeImage(widget.backImageBytes);
+    
+    // Check if ML Kit flagged them as NOT currency
+    if ((frontResult != null && !frontResult.isCurrencyNote) || 
+        (backResult != null && !backResult.isCurrencyNote)) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Invalid Image Detected', style: TextStyle(color: Colors.red)),
+            content: const Text('One or both of the images do not appear to be valid currency notes. Please make sure the note is clearly visible in the frame and try again.'),
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // dismiss dialog
+                  Navigator.of(context).pop(); // go back to scanner
+                },
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+    
+    if (frontResult != null && backResult != null) {
+      final isAuthentic = frontResult.isAuthentic && backResult.isAuthentic;
+      final confidenceScore = (frontResult.confidenceScore + backResult.confidenceScore) / 2;
+      _result = DetectionResult(isAuthentic: isAuthentic, confidenceScore: confidenceScore);
+    } else {
+      // Fallback if inference fails
+      _result = DetectionResult(isAuthentic: false, confidenceScore: 0.0);
+    }
+
+    // 2. Play UI animation
     for (int i = 0; i < _steps.length; i++) {
       // Simulate time taken for each processing step
-      await Future.delayed(const Duration(milliseconds: 1500));
+      await Future.delayed(const Duration(milliseconds: 1000));
       if (mounted) {
         setState(() {
           _currentStep = i + 1;
@@ -39,9 +93,20 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
       await Future.delayed(const Duration(seconds: 1));
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ResultScreen()),
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(
+            isAuthentic: _result?.isAuthentic ?? false,
+            confidenceScore: _result?.confidenceScore ?? 0.0,
+          ),
+        ),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _mlService.dispose();
+    super.dispose();
   }
 
   @override
@@ -96,24 +161,39 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                   final isCompleted = _currentStep > index;
                   final isCurrent = _currentStep == index;
                   
+                  // Logic to simulate feature failures if the result is Fake
+                  bool isFailed = false;
+                  if (isCompleted && _result != null && !_result!.isAuthentic) {
+                    // Fail Watermark (1), Microprint (2), and Security Thread (3)
+                    if (index >= 1 && index <= 3) {
+                      isFailed = true;
+                    }
+                  }
+                  
+                  final isPassed = isCompleted && !isFailed;
+                  
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 400),
                     curve: Curves.easeInOut,
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isCompleted
-                          ? Colors.green.withOpacity(0.1)
-                          : isCurrent
-                              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                              : Theme.of(context).colorScheme.surface,
+                      color: isFailed
+                          ? Colors.red.withOpacity(0.1)
+                          : isPassed
+                              ? Colors.green.withOpacity(0.1)
+                              : isCurrent
+                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                                  : Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isCompleted
-                            ? Colors.green
-                            : isCurrent
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.transparent,
+                        color: isFailed
+                            ? Colors.red
+                            : isPassed
+                                ? Colors.green
+                                : isCurrent
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.transparent,
                         width: 1.5,
                       ),
                     ),
@@ -124,8 +204,10 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                           transitionBuilder: (Widget child, Animation<double> animation) {
                             return ScaleTransition(scale: animation, child: child);
                           },
-                          child: isCompleted
-                              ? const Icon(Icons.check_circle, color: Colors.green, size: 28, key: ValueKey('done'))
+                          child: isFailed
+                              ? const Icon(Icons.cancel, color: Colors.red, size: 28, key: ValueKey('failed'))
+                              : isPassed
+                                  ? const Icon(Icons.check_circle, color: Colors.green, size: 28, key: ValueKey('done'))
                               : isCurrent
                                   ? SizedBox(
                                       key: const ValueKey('loading'),
@@ -148,11 +230,13 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                           child: Text(
                             _steps[index],
                             style: TextStyle(
-                              color: isCompleted
-                                  ? Colors.green
-                                  : isCurrent
-                                      ? Colors.white
-                                      : Colors.white.withOpacity(0.5),
+                              color: isFailed
+                                  ? Colors.red
+                                  : isPassed
+                                      ? Colors.green
+                                      : isCurrent
+                                          ? Colors.white
+                                          : Colors.white.withOpacity(0.5),
                               fontWeight: isCompleted || isCurrent ? FontWeight.bold : FontWeight.normal,
                               fontSize: 16,
                             ),

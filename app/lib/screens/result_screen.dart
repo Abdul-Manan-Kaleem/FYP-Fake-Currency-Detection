@@ -6,8 +6,8 @@ class ResultScreen extends StatelessWidget {
 
   const ResultScreen({
     super.key,
-    this.isAuthentic = true,
-    this.confidenceScore = 98.5,
+    required this.isAuthentic,
+    required this.confidenceScore,
   });
 
   @override

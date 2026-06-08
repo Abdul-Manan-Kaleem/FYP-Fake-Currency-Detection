@@ -9,13 +9,7 @@ class DashboardTab extends StatefulWidget {
 }
 
 class _DashboardTabState extends State<DashboardTab> {
-  // Mock Data
-  final List<ScanModel> recentScans = [
-    ScanModel(id: 'SCN-8923', noteValue: 'Rs. 5000', isAuthentic: true, confidence: 0.98, date: DateTime.now().subtract(const Duration(minutes: 12))),
-    ScanModel(id: 'SCN-8924', noteValue: 'Rs. 1000', isAuthentic: false, confidence: 0.12, date: DateTime.now().subtract(const Duration(hours: 2))),
-    ScanModel(id: 'SCN-8925', noteValue: 'Rs. 500', isAuthentic: true, confidence: 0.94, date: DateTime.now().subtract(const Duration(days: 1))),
-    ScanModel(id: 'SCN-8926', noteValue: 'Rs. 100', isAuthentic: true, confidence: 0.99, date: DateTime.now().subtract(const Duration(days: 2))),
-  ];
+  final List<ScanModel> recentScans = [];
 
   @override
   Widget build(BuildContext context) {
@@ -26,26 +20,9 @@ class _DashboardTabState extends State<DashboardTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Welcome back,', style: TextStyle(fontSize: 16, color: Colors.white.withValues(alpha: 0.6))),
-                    const SizedBox(height: 4),
-                    const Text('Abdul Manan', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ],
-                ),
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Theme.of(context).colorScheme.surface,
-                  child: const Icon(Icons.person, size: 30, color: Colors.white),
-                )
-              ],
-            ),
-            const SizedBox(height: 40),
+            // Header Section
+            const Text('Dashboard', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 32),
 
             // Monthly Statistics
             const Text('Monthly Statistics', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -66,9 +43,9 @@ class _DashboardTabState extends State<DashboardTab> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildStatItem('Total', '142', Icons.document_scanner),
-                  _buildStatItem('Authentic', '138', Icons.verified_user),
-                  _buildStatItem('Fake', '4', Icons.warning_rounded, isAlert: true),
+                  _buildStatItem('Total', '0', Icons.document_scanner),
+                  _buildStatItem('Authentic', '0', Icons.verified_user),
+                  _buildStatItem('Fake', '0', Icons.warning_rounded, isAlert: true),
                 ],
               ),
             ),
@@ -77,11 +54,22 @@ class _DashboardTabState extends State<DashboardTab> {
             // Recent Scans
             const Text('Recent Scans', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 16),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: recentScans.length,
-              itemBuilder: (context, index) {
+            if (recentScans.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No recent scans found',
+                    style: TextStyle(fontSize: 16, color: Colors.white.withValues(alpha: 0.5)),
+                  ),
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: recentScans.length,
+                itemBuilder: (context, index) {
                 final scan = recentScans[index];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),

@@ -13,11 +13,11 @@ A robust, enterprise-grade AI-powered currency detection mobile application. Bui
 
 The Counter-feit Currency Detection System is architected leveraging professional software engineering practices, separating UI layers from hardware logic to ensure a bug-free, performant experience.
 
-* **Advanced Scanning Module (`lib/widgets`, `lib/screens/scan_tab.dart`):**
-  * **Live Engine Initialization**: Deeply integrated Flutter `camera` controller initializing back-mounted hardware with a fluid `290x155` dynamic alignment viewfinder.
-  * **Optimized Event Lifecycles**: Custom built-in `WidgetsBindingObserver` that intelligently garbage-collects and releases the camera pipeline instantly when the application is backgrounded, mitigating hardware locking and memory leaks.
-  * **Background Battery Protection**: Utilizes `TickerMode` to pause active streaming the moment the user navigates away from the scanner tab.
-  * **Modular Hardware Services**: Abstracted `ImagePickerService` decoupling gallery reading configurations from UI state logic.
+* **Advanced Scanning Module (`lib/screens/scan_tab.dart`):**
+  * **Native Smart Scanner Integration**: Integrates Google ML Kit Document Scanner to provide an enterprise-grade, CamScanner-like UI.
+  * **Automatic Edge Detection**: Real-time bounding box rendering that intelligently detects document corners.
+  * **Auto-Cropping & Filtering**: Automatically crops the background and applies perspective correction to the currency notes.
+  * **Dual-Sided Scanning Session**: Seamlessly guides the user to capture both the front and back sides of the note in a single native camera session.
   
 * **Interactive UI/UX Infrastructure:**
   * **Modern Frameworks:** Prioritizing modern Material 3 design specifications utilizing precise hexadecimal tokens (`0xFF0B0F19`, `0xFF00D2FF`) for dark mode interfaces.
@@ -83,10 +83,10 @@ To compile and execute a local copy of this software architecture, follow these 
 - [x] **Project Structure Setup**: Professional monorepo structure separating ML backend and Flutter frontend (`app/` directory).
 - [x] **Core Navigation UI**: Dashboard with Bottom Navigation Bar (Home, Scan, History).
 - [x] **Onboarding Flow**: Structured onboarding experience for first-time users.
-- [x] **Camera Integration**: Abstracted Platform Camera Streams & Deep UI Overlays with proper lifecycle management.
+- [x] **Smart Scanner Integration**: Integrated Google ML Kit Document Scanner for automatic edge detection, perspective correction, and cropping (CamScanner-like UX).
 - [x] **AI Analysis UI Flow**: Implemented a simulated "Processing" screen with dynamic step-by-step progress, followed by a beautiful "Result" screen mapping passed/failed security features.
 - [ ] **Deep Learning Edge Integration**: Connecting the UI to the actual On-Device TensorFlow Lite model (`currency_model.tflite`).
-- [ ] **Instantaneous PKR Mapping & Matrix Veracity Plotting**: Real-time bounding box rendering over the live camera feed based on ML outputs.
+- [ ] **PKR Feature Mapping & Matrix Veracity Plotting**: Rendering localized bounding boxes over the scanned note images based on ML outputs.
 ---
 #### *Supervisor:* M. Junaid Khan
 ---
