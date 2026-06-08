@@ -15,6 +15,31 @@ class ResultScreen extends StatelessWidget {
     this.backImageBytes,
   });
 
+  Widget _buildBoundingBox(bool isAuthentic, String label) {
+    final color = isAuthentic ? Colors.greenAccent : Colors.redAccent;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: color, width: 2),
+        color: color.withOpacity(0.2),
+      ),
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          color: color,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -53,9 +78,34 @@ class ResultScreen extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Image.memory(
-                    frontImageBytes!,
-                    fit: BoxFit.cover,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.memory(
+                            frontImageBytes!,
+                            fit: BoxFit.cover,
+                          ),
+                          // Simulated Watermark Bounding Box
+                          Positioned(
+                            left: constraints.maxWidth * 0.05,
+                            top: constraints.maxHeight * 0.15,
+                            width: constraints.maxWidth * 0.3,
+                            height: constraints.maxHeight * 0.7,
+                            child: _buildBoundingBox(isAuthentic, "Watermark"),
+                          ),
+                          // Simulated Security Thread Bounding Box
+                          Positioned(
+                            left: constraints.maxWidth * 0.65,
+                            top: 0,
+                            width: constraints.maxWidth * 0.08,
+                            height: constraints.maxHeight,
+                            child: _buildBoundingBox(isAuthentic, "Thread"),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               )

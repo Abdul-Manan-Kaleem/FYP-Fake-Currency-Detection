@@ -86,7 +86,7 @@ To compile and execute a local copy of this software architecture, follow these 
 - [x] **Smart Scanner Integration**: Integrated Google ML Kit Document Scanner for automatic edge detection, perspective correction, and cropping (CamScanner-like UX).
 - [x] **AI Analysis UI Flow**: Implemented a simulated "Processing" screen with dynamic step-by-step progress, followed by a beautiful "Result" screen mapping passed/failed security features.
 - [x] **Deep Learning Edge Integration**: Connected the UI to the actual On-Device TensorFlow Lite model (`currency_model.tflite`). Includes robust probability averaging across Front/Back dual-sided scans to prevent false positives/negatives.
-- [ ] **PKR Feature Mapping & Matrix Veracity Plotting**: (In Progress) Dynamic Image Viewer implemented on Result Screen. Next: Rendering localized bounding boxes over the scanned note.
+- [x] **PKR Feature Mapping & Matrix Veracity Plotting**: Renders localized bounding boxes over the scanned note images based on ML outputs, mapping the Watermark and Security Thread.
 ---
 #### *Supervisor:* M. Junaid Khan
 ---
