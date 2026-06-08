@@ -85,7 +85,7 @@ To compile and execute a local copy of this software architecture, follow these 
 - [x] **Onboarding Flow**: Structured onboarding experience for first-time users.
 - [x] **Smart Scanner Integration**: Integrated Google ML Kit Document Scanner for automatic edge detection, perspective correction, and cropping (CamScanner-like UX).
 - [x] **AI Analysis UI Flow**: Implemented a simulated "Processing" screen with dynamic step-by-step progress, followed by a beautiful "Result" screen mapping passed/failed security features.
-- [ ] **Deep Learning Edge Integration**: Connecting the UI to the actual On-Device TensorFlow Lite model (`currency_model.tflite`).
+- [x] **Deep Learning Edge Integration**: Connected the UI to the actual On-Device TensorFlow Lite model (`currency_model.tflite`). Includes robust probability averaging across Front/Back dual-sided scans to prevent false positives/negatives.
 - [ ] **PKR Feature Mapping & Matrix Veracity Plotting**: Rendering localized bounding boxes over the scanned note images based on ML outputs.
 ---
 #### *Supervisor:* M. Junaid Khan

@@ -69,9 +69,20 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     }
     
     if (frontResult != null && backResult != null) {
-      final isAuthentic = frontResult.isAuthentic && backResult.isAuthentic;
-      final confidenceScore = (frontResult.confidenceScore + backResult.confidenceScore) / 2;
-      _result = DetectionResult(isAuthentic: isAuthentic, confidenceScore: confidenceScore);
+      // Instead of a strict &&, we average the real and fake probabilities
+      // This prevents a single 'confused' scan (e.g. back of the note) from ruining the result
+      final avgRealProb = (frontResult.realProbability + backResult.realProbability) / 2;
+      final avgFakeProb = (frontResult.fakeProbability + backResult.fakeProbability) / 2;
+      
+      final isAuthentic = avgRealProb > avgFakeProb;
+      final confidenceScore = (isAuthentic ? avgRealProb : avgFakeProb) * 100.0;
+      
+      _result = DetectionResult(
+        isAuthentic: isAuthentic, 
+        confidenceScore: confidenceScore,
+        realProbability: avgRealProb,
+        fakeProbability: avgFakeProb,
+      );
     } else {
       // Fallback if inference fails
       _result = DetectionResult(isAuthentic: false, confidenceScore: 0.0);

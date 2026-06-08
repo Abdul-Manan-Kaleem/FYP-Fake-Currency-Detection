@@ -7,11 +7,15 @@ import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 class DetectionResult {
   final bool isAuthentic;
   final double confidenceScore;
+  final double realProbability;
+  final double fakeProbability;
   final bool isCurrencyNote;
 
   DetectionResult({
     required this.isAuthentic, 
     required this.confidenceScore,
+    this.realProbability = 0.0,
+    this.fakeProbability = 0.0,
     this.isCurrencyNote = true,
   });
 }
@@ -109,12 +113,18 @@ class MLService {
       final fakeProb = probabilities[0];
       final realProb = probabilities[1];
 
+      print('--- ML Inference Results ---');
+      print('Fake Probability: ${(fakeProb * 100).toStringAsFixed(2)}%');
+      print('Real Probability: ${(realProb * 100).toStringAsFixed(2)}%');
+
       final isAuthentic = realProb > fakeProb;
       final confidence = isAuthentic ? realProb : fakeProb;
 
       return DetectionResult(
         isAuthentic: isAuthentic,
         confidenceScore: confidence * 100.0,
+        realProbability: realProb,
+        fakeProbability: fakeProb,
       );
     } catch (e) {
       print('Error running ML analysis: $e');
