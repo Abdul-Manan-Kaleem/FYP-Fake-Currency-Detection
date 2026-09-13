@@ -1,148 +1,73 @@
 # Counterfeit Currency Detection System
 
-A mobile app that checks whether a Pakistani Rupee (PKR) banknote is real or fake. You scan the note with your phone camera, and the app uses an AI model running directly on your device to give you a verdict — no internet needed.
-
-Built with **Flutter** (Dart) for the mobile app, and **TensorFlow Lite** (MobileNetV3) for the AI model.
+An On-Device Artificial Intelligence Solution for Pakistani Banknote Authentication
 
 ---
 
-## What the App Does
+## Project Overview
 
-1. **Scans your banknote** — Uses Google ML Kit's document scanner to automatically detect the note's edges, crop it, and fix the angle. Works like CamScanner.
-2. **Asks for both sides** — Guides you to capture the front and back of the note in one session.
-3. **Checks if it's actually a banknote** — Before running the AI, it uses image labeling to confirm you scanned a real piece of currency (not a random photo).
-4. **Runs AI analysis on-device** — A MobileNetV3 model (~6.4 MB) classifies the note as Real or Fake. Everything runs locally on your phone.
-5. **Averages both sides** — Combines the confidence scores from the front and back scans to reduce errors.
-6. **Shows you the result** — Displays whether the note is authentic or counterfeit, a confidence percentage, and highlights where the Watermark and Security Thread should be.
+The **Counterfeit Currency Detection System** is an advanced mobile solution designed to verify the authenticity of Pakistani Rupee (PKR) banknotes in real time. Powered by on-device deep learning, the system allows users to capture photos of a banknote using their smartphone camera and immediately receive an accurate verification verdict without requiring an active internet connection.
+
+The application combines **Flutter** for a responsive cross-platform mobile interface and an optimized **MobileNetV3-Small TensorFlow Lite model** for low-latency, private, on-device artificial intelligence inference.
 
 ---
 
-## What's Been Built So Far
+## Core Application Workflow
 
-### Mobile App (Flutter)
-
-| Screen | File | What it does |
-|--------|------|-------------|
-| Splash Screen | `splash_screen.dart` | Animated loading screen on app startup |
-| Onboarding | `onboarding_screen.dart` | First-time user walkthrough (swipeable pages) |
-| Dashboard | `dashboard_tab.dart` | Home screen with scan stats (how many real vs fake) and quick actions |
-| Scanner | `scan_tab.dart` | Launches the ML Kit document scanner, handles front/back capture flow |
-| Processing | `processing_screen.dart` | Shows a step-by-step progress animation while the AI analyzes both scans |
-| Results | `result_screen.dart` | Shows the verdict, confidence %, and bounding boxes over the note image |
-| History | `history_tab.dart` | List of previous scans |
-| Navigation | `main_navigation.dart` | Bottom tab bar (Home, Scan, History) |
-
-All screens use a **dark theme** with Material 3 design.
-
-### AI / Machine Learning
-
-| Component | Location | What it does |
-|-----------|----------|-------------|
-| Trained model | `model/currency_model.tflite` | MobileNetV3-Small, trained to classify PKR notes as real or fake |
-| Model in app | `app/assets/models/currency_model.tflite` | Same model, bundled inside the Flutter app for on-device use |
-| ML service | `app/lib/services/ml_service.dart` | Loads the model, runs inference, returns real/fake probabilities |
-| Image preprocessing | `app/lib/services/image_preprocessing_service.dart` | Resizes images to 224×224, fixes rotation, boosts contrast and exposure |
-| Training notebooks | `notebooks/Model Trained.ipynb` | Code used to train the model |
-| Model comparison | `notebooks/Best models (5) accuracy.ipynb` | Compared 5 different model architectures for accuracy |
-| TFLite converter | `scripts/convert_to_tflite.py` | Converts the trained Keras model to TFLite format |
-
-### CI/CD
-
-- **GitHub Actions** (`.github/workflows/build_apk.yml`) — Automatically builds a release APK whenever code is pushed to `main`.
-
-### Documentation
-
-- `docs/Project_Documentation.md` — Technical architecture details
-- `docs/Supervisor_Meeting_Prep.md` — Viva/defense preparation Q&A
-- `docs/Fake Currency Detection using MobileNetV3 Documentation.docx` — Formal project report
+1. **Intelligent Document Scanning**: Utilizes Google ML Kit Document Scanner to automatically detect banknote boundaries, crop excess background, and correct perspective angles.
+2. **Dual-Sided Verification**: Guides the user through capturing both the front and back of the banknote for comprehensive analysis.
+3. **Currency Validation Pre-Check**: Verifies that the scanned image is indeed a banknote before running deep learning analysis, preventing false inputs.
+4. **On-Device AI Classification**: Processes the scanned images locally through an optimized 6.4 MB MobileNetV3 neural network to calculate real versus counterfeit probability scores.
+5. **Score Aggregation**: Combines and averages confidence metrics from both banknote sides to eliminate single-perspective false positives.
+6. **Visual Result Reporting**: Displays the overall authentication verdict, confidence percentage, and an interactive overlay mapping key security features such as the Watermark and Security Thread.
 
 ---
 
-## How the Detection Pipeline Works
+## System Components
 
-```
-Phone Camera
-    │
-    ▼
-ML Kit Document Scanner (auto edge detection, crop, perspective fix)
-    │
-    ▼
-Front image captured → Back image captured
-    │
-    ▼
-Sanity check: Is this actually a banknote? (ML Kit Image Labeler)
-    │
-    ▼
-Image preprocessing (resize to 224×224, boost contrast, fix rotation)
-    │
-    ▼
-TFLite model runs on each image → outputs [fake %, real %]
-    │
-    ▼
-Average the front and back probabilities together
-    │
-    ▼
-Show result: Real or Fake, confidence %, security feature overlay
-```
+### Mobile Application Features
+- **Splash & Onboarding**: Smooth welcome animations and intuitive first-time user guidance.
+- **Interactive Dashboard**: Overview of past scan analytics, quick scan triggers, and security tips.
+- **Smart Scanner**: Real-time camera viewfinder with automatic document cropping.
+- **Step-by-Step Processing**: Visual feedback while AI models analyze image layers.
+- **Detailed Results**: Clear verdict display with confidence metrics and feature overlay maps.
+- **Scan History**: Historical log of past currency verifications saved locally on the device.
+
+### Artificial Intelligence & Machine Learning
+- **MobileNetV3 Neural Network**: Compact deep learning architecture optimized for mobile devices.
+- **TensorFlow Lite Engine**: High-performance local inference engine bundled directly inside the application package.
+- **Image Preprocessing Pipeline**: Automated image normalization, 224x224 scaling, contrast adjustment, and rotation correction.
+
+### Continuous Integration & Deployment
+- **Automated Builds**: Integrated GitHub Actions workflow that compiles release Android application packages (APK) automatically on project updates.
 
 ---
 
-## Project Structure
+## Application Architecture
 
-```
-FYP-Fake-Currency-Detection/
-│
-├── app/                        ← Flutter mobile app
-│   ├── lib/
-│   │   ├── main.dart           ← App entry point
-│   │   ├── screens/            ← All UI screens (listed in table above)
-│   │   ├── services/           ← ML inference, image processing, image picker
-│   │   └── models/             ← Data models (scan_model.dart)
-│   ├── assets/models/          ← Bundled TFLite model
-│   ├── pubspec.yaml            ← Flutter dependencies
-│   └── android/ & ios/         ← Platform-specific configs
-│
-├── model/                      ← Exported ML model (currency_model.tflite)
-├── notebooks/                  ← Jupyter notebooks for training & evaluation
-├── scripts/                    ← Utility scripts (Keras → TFLite converter)
-├── Data-Set/                   ← Links to training dataset
-├── docs/                       ← Project documentation & defense prep
-└── .github/workflows/          ← CI/CD pipeline (auto-build APK)
-```
+- **Mobile Application**: Located in the `app` folder, containing all user interface screens, services, and native Android/iOS platform configurations.
+- **Machine Learning Models**: Located in the `model` folder, containing trained model weights and TensorFlow Lite exports.
+- **Research & Development**: Located in the `notebooks` folder, containing model training experiments and accuracy evaluations.
+- **Project Documentation**: Located in the `docs` folder, containing comprehensive technical architecture reports and presentation materials.
 
 ---
 
-## How to Run It
+## Running the Application
 
-**You need:** Flutter SDK installed ([install guide](https://docs.flutter.dev/get-started/install))
+To run the application on a physical smartphone or emulator:
 
-```bash
-# 1. Clone the repo
-git clone https://github.com/Abdul-Manan-Kaleem/FYP-Fake-Currency-Detection.git
-
-# 2. Go into the app folder
-cd FYP-Fake-Currency-Detection/app
-
-# 3. Install dependencies
-flutter pub get
-
-# 4. Connect a physical Android device and run
-flutter run
-```
-
-> **Note:** The scanner needs camera access. Make sure your device has camera permissions enabled.
-
-**For retraining the model (optional):** You need Python 3.10+ and the packages listed in the notebooks.
+1. Ensure the Flutter SDK is installed on your development system.
+2. Open a terminal in the application directory (`app`).
+3. Fetch application dependencies using `flutter pub get`.
+4. Connect an Android smartphone with camera permissions enabled and run `flutter run`.
 
 ---
 
-## Team
+## Project Team
 
-| Role | Name |
-|------|------|
-| Supervisor | M. Junaid Khan |
-| Developer | Abdul Manan Kaleem |
-| Model Training | Raja Waleed |
-| Testing & Documentation | M. Usman |
+- **Supervisor**: M. Junaid Khan  
+- **Lead Developer**: Abdul Manan Kaleem  
+- **Machine Learning Specialist**: Raja Waleed  
+- **Quality Assurance & Documentation**: M. Usman  
 
 *Final Year Project — Department of Computer Science*
