@@ -102,6 +102,9 @@ class MLService {
       img.Image? decodedImage = img.decodeImage(imageBytes);
       if (decodedImage == null) return null;
 
+      // Ensure orientation is corrected (camera EXIF 90/270 degree rotation fix)
+      decodedImage = img.bakeOrientation(decodedImage);
+
       // Resize image to 224x224
       img.Image resizedImage = img.copyResize(decodedImage, width: _inputSize, height: _inputSize);
 
@@ -133,9 +136,16 @@ class MLService {
       _interpreter!.run(input, output);
 
       // Interpret results
-      final probabilities = output[0];
-      final fakeProb = probabilities[0];
-      final realProb = probabilities[1];
+      final rawOutputs = output[0];
+      double fakeProb = rawOutputs[0];
+      double realProb = rawOutputs[1];
+
+      // Ensure probabilities sum to 1.0 (softmax normalization)
+      final sumProbs = fakeProb + realProb;
+      if (sumProbs > 0) {
+        fakeProb = (fakeProb / sumProbs).clamp(0.0, 1.0);
+        realProb = (realProb / sumProbs).clamp(0.0, 1.0);
+      }
 
       print('--- ML Inference Results ---');
       print('Fake Probability: ${(fakeProb * 100).toStringAsFixed(2)}%');
@@ -149,6 +159,7 @@ class MLService {
         confidenceScore: confidence * 100.0,
         realProbability: realProb,
         fakeProbability: fakeProb,
+        isCurrencyNote: true,
       );
     } catch (e) {
       print('Error running ML analysis: $e');
