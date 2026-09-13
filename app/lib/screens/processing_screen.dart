@@ -43,8 +43,16 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     final backResult = await _mlService.analyzeImage(widget.backImageBytes);
     
     // Check if ML Kit flagged them as NOT currency
-    if ((frontResult != null && !frontResult.isCurrencyNote) || 
-        (backResult != null && !backResult.isCurrencyNote)) {
+    // Only reject if BOTH sides fail — the back of PKR notes often looks
+    // different enough that the generic labeler doesn't recognize it alone.
+    final frontNotCurrency = frontResult != null && !frontResult.isCurrencyNote;
+    final backNotCurrency = backResult != null && !backResult.isCurrencyNote;
+    
+    print('--- Currency Pre-Check ---');
+    print('  Front is currency: ${frontResult?.isCurrencyNote ?? "null"}');
+    print('  Back is currency: ${backResult?.isCurrencyNote ?? "null"}');
+    
+    if (frontNotCurrency && backNotCurrency) {
       if (mounted) {
         showDialog(
           context: context,

@@ -13,6 +13,7 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+desktop.ini
 
 # Python & Machine Learning
 __pycache__/
@@ -23,9 +24,29 @@ venv/
 env/
 .env
 .ipynb_checkpoints/
+*.h5
+*.hdf5
+*.ckpt
+*.pkl
 
 # Flutter/Dart (Fallback, primarily handled by app/.gitignore)
 .dart_tool/
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
+.packages
+
+# Gradle & Android build artifacts
+.gradle/
+**/android/.gradle/
+**/android/app/build/
+**/android/build/
+*.apk
+*.aab
+*.jks
+*.keystore
+local.properties
+
+# Antigravity / Gemini agent files
+.agents/
+.gemini/

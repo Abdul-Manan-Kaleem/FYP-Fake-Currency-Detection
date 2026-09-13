@@ -45,7 +45,9 @@ class MLService {
       await tempFile.writeAsBytes(imageBytes);
       
       final inputImage = InputImage.fromFile(tempFile);
-      final ImageLabelerOptions options = ImageLabelerOptions(confidenceThreshold: 0.5);
+      // Lower confidence threshold — the base ML Kit labeler often scores
+      // currency-related labels at 0.2-0.4 for banknotes, so 0.5 drops them.
+      final ImageLabelerOptions options = ImageLabelerOptions(confidenceThreshold: 0.2);
       final imageLabeler = ImageLabeler(options: options);
       
       final List<ImageLabel> labels = await imageLabeler.processImage(inputImage);
@@ -54,13 +56,35 @@ class MLService {
         await tempFile.delete();
       }
       
+      // Log all detected labels for debugging
+      print('--- ML Kit Image Labels ---');
+      for (final label in labels) {
+        print('  Label: "${label.label}" (confidence: ${(label.confidence * 100).toStringAsFixed(1)}%)');
+      }
+      
       bool isCurrency = false;
-      final validKeywords = ['money', 'cash', 'currency', 'banknote', 'paper', 'document', 'text', 'rectangle'];
+      // Expanded keyword list — the generic ImageNet labeler returns a wide
+      // variety of labels for banknotes depending on lighting/angle/side.
+      final validKeywords = [
+        // Direct currency terms
+        'money', 'cash', 'currency', 'banknote', 'bill', 'note', 'coin',
+        // Paper/document terms (very common for scanned notes)
+        'paper', 'document', 'text', 'rectangle', 'paper product',
+        // Visual pattern terms (common for patterned banknotes)
+        'font', 'number', 'pattern', 'print', 'printing',
+        'colorfulness', 'art', 'graphic', 'design', 'illustration',
+        // Material/texture terms
+        'material property', 'material', 'textile', 'label',
+        // Shape/object terms
+        'envelope', 'card', 'ticket', 'receipt', 'stationery',
+        'photograph', 'image', 'picture',
+      ];
       
       for (ImageLabel label in labels) {
         final text = label.label.toLowerCase();
         if (validKeywords.any((keyword) => text.contains(keyword))) {
           isCurrency = true;
+          print('  ✓ Matched keyword in label: "$text"');
           break;
         }
       }
