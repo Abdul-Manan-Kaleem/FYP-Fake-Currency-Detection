@@ -5,3 +5,8 @@ app/linux/** linguist-generated=true
 app/macos/** linguist-generated=true
 app/windows/** linguist-generated=true
 app/web/** linguist-generated=true
+
+# Exclude Jupyter Notebooks from GitHub Language Statistics
+*.ipynb linguist-documentation=true
+*.ipynb linguist-detectable=false
+notebooks/** linguist-documentation=true
