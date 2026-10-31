@@ -1,0 +1,8 @@
+0 monument_10
+1 monument_20
+2 monument_50
+3 monument_100
+4 monument_500
+5 monument_1000
+6 monument_5000
+7 invalid

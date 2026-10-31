@@ -1,0 +1,31 @@
+# === Large data / model files ===
+monument_photos/
+mobilenetv3_pkr5000/
+*.tflite
+
+# === Build artifacts ===
+**/build/
+
+# === IDE / Editor ===
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# === Flutter / Dart ===
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+
+# === Logs ===
+*.log
+
+# === OS generated ===
+.DS_Store
+Thumbs.db
+
+# === Python ===
+*.pyc
+__pycache__/

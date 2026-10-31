@@ -1,0 +1,61 @@
+{
+  "verified": true,
+  "classes": [
+    "monument_10",
+    "monument_20",
+    "monument_50",
+    "monument_100",
+    "monument_500",
+    "monument_1000",
+    "monument_5000",
+    "invalid"
+  ],
+  "per_class": {
+    "monument_10": {
+      "test_photos": 33,
+      "accuracy": 1.0
+    },
+    "monument_20": {
+      "test_photos": 40,
+      "accuracy": 1.0
+    },
+    "monument_50": {
+      "test_photos": 37,
+      "accuracy": 1.0
+    },
+    "monument_100": {
+      "test_photos": 38,
+      "accuracy": 1.0
+    },
+    "monument_500": {
+      "test_photos": 41,
+      "accuracy": 1.0
+    },
+    "monument_1000": {
+      "test_photos": 49,
+      "accuracy": 1.0
+    },
+    "monument_5000": {
+      "test_photos": 50,
+      "accuracy": 1.0
+    },
+    "invalid": {
+      "test_photos": 339,
+      "accuracy": 0.985
+    }
+  },
+  "images_per_class": {
+    "monument_10": 162,
+    "monument_20": 176,
+    "monument_50": 172,
+    "monument_100": 171,
+    "monument_500": 182,
+    "monument_1000": 173,
+    "monument_5000": 174,
+    "invalid": 1684
+  },
+  "preprocess": "letterbox",
+  "input": "float32 [1,224,224,3], whole image letterboxed on grey 114, x/127.5-1",
+  "trained_at": "2026-11-01T03:15:34",
+  "source": "C:\\Users\\manan\\Desktop\\FYP-2\\monument_photos\\DataSet_sorted"
+}
