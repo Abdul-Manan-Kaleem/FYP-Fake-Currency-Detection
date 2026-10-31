@@ -2,6 +2,8 @@
 monument_photos/
 mobilenetv3_pkr5000/
 *.tflite
+# …except the models the current app needs to build and run.
+!fake_currency_detector/assets/models/*.tflite
 
 # === Build artifacts ===
 **/build/
