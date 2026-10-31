@@ -6,26 +6,59 @@ mobilenetv3_pkr5000/
 # === Build artifacts ===
 **/build/
 
-# === IDE / Editor ===
+# === IDEs and Editors ===
 .idea/
 .vscode/
 *.iml
 *.ipr
 *.iws
 
+# === OS generated files ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# === Python & Machine Learning ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+.env
+.ipynb_checkpoints/
+*.h5
+*.hdf5
+*.ckpt
+*.pkl
+
 # === Flutter / Dart ===
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
+
+# === Gradle & Android build artifacts ===
+.gradle/
+**/android/.gradle/
+**/android/app/build/
+**/android/build/
+*.apk
+*.aab
+*.jks
+*.keystore
+local.properties
 
 # === Logs ===
 *.log
 
-# === OS generated ===
-.DS_Store
-Thumbs.db
-
-# === Python ===
-*.pyc
-__pycache__/
+# === Antigravity / Gemini agent files ===
+.agents/
+.gemini/
