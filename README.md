@@ -243,8 +243,8 @@ To ensure high performance and prevent battery drain or memory leaks during acti
 | :--- | :--- | :--- |
 | **M. Junaid Khan** | Project Supervisor | Academic Oversight & Architectural Guidance |
 | **Abdul Manan Kaleem** | Lead Developer | Mobile Application Engineering, Hardware Integration & Preprocessing |
-| **Raja Waleed** | Machine Learning Specialist | Neural Network Training, Optimization & TFLite Conversion |
-| **M. Usman** | QA & Documentation Lead | System Testing, Dataset Verification & Technical Documentation |
+| **Raja Waleed Ahmad** | Machine Learning Specialist | Neural Network Training, Optimization & TFLite Conversion |
+| **M. Usman Ghulam** | QA & Documentation Lead | System Testing, Dataset Verification & Technical Documentation |
 
 ---
 
