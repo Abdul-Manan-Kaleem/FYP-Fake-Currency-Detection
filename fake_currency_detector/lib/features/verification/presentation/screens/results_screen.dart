@@ -110,6 +110,8 @@ class ResultsScreen extends ConsumerWidget {
                     value: result.denomination!,
                     color: color,
                   ),
+                const SizedBox(height: 16),
+                _SummaryCard(result: result),
                 if (!inconclusive &&
                     result.checks.any(
                       (c) => c.status == CheckStatus.skipped,
@@ -148,7 +150,9 @@ class ResultsScreen extends ConsumerWidget {
                         '${result.passedCount}/${result.applicableCount} PASSED',
                   ),
                   const SizedBox(height: 10),
-                  for (final (i, c) in result.checks.indexed)
+                  // Problems first: fail, unclear, warning, then passes, then
+                  // checks that did not run or do not apply.
+                  for (final (i, c) in _problemsFirst(result.checks).indexed)
                     _StaggeredIn(
                       index: i,
                       child: Padding(
@@ -159,24 +163,6 @@ class ResultsScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                ],
-                if (result.analysis?.detections.isNotEmpty ?? false) ...[
-                  const SizedBox(height: 14),
-                  const _SectionHeader(title: 'WHAT YOLO11s SAW'),
-                  const SizedBox(height: 10),
-                  for (final (key, label, path) in [
-                    ('front', 'FRONT', frontImagePath),
-                    ('back', 'BACK', backImagePath),
-                  ])
-                    if (result.analysis!.detections[key] case final d?)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: DetectionOverlayCard(
-                          side: label,
-                          imagePath: path,
-                          detections: d,
-                        ),
-                      ),
                 ],
                 if (!inconclusive && result.messages.isNotEmpty) ...[
                   const SizedBox(height: 14),
@@ -191,16 +177,47 @@ class ResultsScreen extends ConsumerWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 18),
-                Text(
-                  'Engine: ${result.source.toUpperCase()} · '
-                  'Raw score ${result.confidence.rawScore.toStringAsFixed(1)} · '
-                  '${TimeOfDay.fromDateTime(result.analyzedAt).format(context)}'
-                  '${_timings(result)}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textMuted,
+                // Developer detail stays out of the way until asked for.
+                const SizedBox(height: 14),
+                Theme(
+                  data: Theme.of(context)
+                      .copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: EdgeInsets.zero,
+                    iconColor: AppColors.cyan,
+                    collapsedIconColor: AppColors.textMuted,
+                    title: Text(
+                      'TECHNICAL DETAILS',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                    children: [
+                      if (result.analysis?.detections.isNotEmpty ?? false)
+                        for (final (key, label, path) in [
+                          ('front', 'FRONT', frontImagePath),
+                          ('back', 'BACK', backImagePath),
+                        ])
+                          if (result.analysis!.detections[key] case final d?)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: DetectionOverlayCard(
+                                side: label,
+                                imagePath: path,
+                                detections: d,
+                              ),
+                            ),
+                      Text(
+                        'Engine: ${result.source.toUpperCase()} · '
+                        'Raw score ${result.confidence.rawScore.toStringAsFixed(1)} · '
+                        '${TimeOfDay.fromDateTime(result.analyzedAt).format(context)}'
+                        '${_timings(result)}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -229,6 +246,146 @@ String _timings(VerificationResultModel r) {
   if (t.isEmpty) return '';
   final parts = t.entries.map((e) => '${e.key} ${e.value} ms').join(' · ');
   return '\n$parts';
+}
+
+int _statusRank(CheckStatus s) => switch (s) {
+      CheckStatus.fail => 0,
+      CheckStatus.inconclusive => 1,
+      CheckStatus.warning => 2,
+      CheckStatus.pass => 3,
+      CheckStatus.skipped => 4,
+      CheckStatus.notApplicable => 5,
+    };
+
+/// Checks ordered fail → unclear → warning → pass → skipped → N/A, keeping
+/// the engine's order inside each group (stable).
+List<FeatureCheckModel> _problemsFirst(List<FeatureCheckModel> checks) {
+  final indexed = checks.indexed.toList()
+    ..sort((a, b) {
+      final byStatus = _statusRank(a.$2.status).compareTo(_statusRank(b.$2.status));
+      return byStatus != 0 ? byStatus : a.$1.compareTo(b.$1);
+    });
+  return [for (final e in indexed) e.$2];
+}
+
+/// Plain-language answer at the top: what happened, why, and what to do.
+/// English first, then Roman Urdu (the wording the rest of the app uses).
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.result});
+
+  final VerificationResultModel result;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = result.verdict;
+    final color = v.color;
+    final problems = [
+      for (final c in result.checks)
+        if (c.status == CheckStatus.fail || c.status == CheckStatus.inconclusive)
+          '${c.title}: ${c.summary}',
+    ];
+
+    final (headline, urdu) = switch (v) {
+      VerificationVerdict.real => (
+          'The note passed all of the app\'s checks.',
+          'Note ne tamam checks pass kar liye.',
+        ),
+      VerificationVerdict.suspicious => (
+          'Something does not look right. Check the items marked FAIL below.',
+          'Kuch theek nahi lag raha. Neeche FAIL wali cheezen dekhen.',
+        ),
+      VerificationVerdict.fake => (
+          'This looks like a fake note.',
+          'Ye jaali note lag raha hai.',
+        ),
+      VerificationVerdict.unableToVerify || VerificationVerdict.incomplete => (
+          'We could not verify this note. This does not mean it is fake.',
+          'Tasdeeq nahi ho saki. Iska matlab ye nahi ke note jaali hai.',
+        ),
+      VerificationVerdict.notBanknote => (
+          'This does not look like a banknote.',
+          'Ye note ki tasveer nahi lag rahi.',
+        ),
+    };
+
+    final conclusive = v == VerificationVerdict.real ||
+        v == VerificationVerdict.suspicious ||
+        v == VerificationVerdict.fake;
+    final action = switch (v) {
+      VerificationVerdict.unableToVerify ||
+      VerificationVerdict.incomplete =>
+        'Retake clear photos of both sides: note flat, even light, no glare.',
+      VerificationVerdict.notBanknote =>
+        'Photograph the whole note on a plain dark surface.',
+      _ => null,
+    };
+
+    return GlassContainer(
+      glowColor: color,
+      glowIntensity: 0.18,
+      borderColor: color.withValues(alpha: 0.45),
+      fill: color.withValues(alpha: 0.07),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            headline,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            urdu,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
+          if (conclusive && result.applicableCount > 0) ...[
+            const SizedBox(height: 10),
+            Text(
+              '${result.passedCount} of ${result.applicableCount} checks passed',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: color,
+              ),
+            ),
+          ],
+          if (problems.isNotEmpty && v != VerificationVerdict.notBanknote) ...[
+            const SizedBox(height: 10),
+            for (final p in problems.take(4)) _Bullet(text: p),
+            if (problems.length > 4)
+              Text(
+                '+${problems.length - 4} more in the checklist below',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+          ],
+          if (action != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              action,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            ),
+          ],
+          if (v == VerificationVerdict.real) ...[
+            const SizedBox(height: 10),
+            const Text(
+              'This is an automated screening result, not a certified '
+              'authentication.',
+              style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _PartialBanner extends StatelessWidget {
