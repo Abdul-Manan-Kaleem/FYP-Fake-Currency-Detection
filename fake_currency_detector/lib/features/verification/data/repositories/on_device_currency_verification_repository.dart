@@ -12,10 +12,10 @@ import '../../domain/side_classifier.dart';
 import '../models/note_analysis_model.dart';
 import '../on_device/image_preprocessor.dart';
 import '../on_device/microprint_reader.dart';
+import '../on_device/mobilenetv3_small_classifier.dart';
 import '../on_device/monument_classifier.dart';
 import '../on_device/note_presence.dart';
 import '../on_device/note_side_classifier.dart';
-import '../on_device/page_detector.dart';
 import '../on_device/partial_note_detector.dart';
 import '../on_device/pkr5000_counterfeit_classifier.dart';
 import '../on_device/note_text_parser.dart';
@@ -68,6 +68,7 @@ class OnDeviceCurrencyVerificationRepository
   Future<YoloDetector>? _yolo;
   Future<Rs5000AnomalyClassifier>? _cnn;
   Future<Pkr5000CounterfeitClassifier>? _counterfeitCnn;
+  Future<MobileNetV3SmallClassifier>? _smallCnn;
   Future<MonumentClassifier?>? _monument;
 
   /// Scans by image path. A path is a unique captured file, so a retake is a
@@ -198,41 +199,11 @@ class OnDeviceCurrencyVerificationRepository
       final frontNote = _bestNote(frontDets);
       final backNote = _bestNote(backDets);
 
-      // 1a. A sheet of paper (A4 page, printout, photocopy) is rejected
-      //     first, with instructions, whatever YOLO thinks it sees on it.
-      final paper = [
-        ?PageDetector.rejection(
-          side: 'FRONT',
-          aspectRatio: f.aspectRatio,
-          paperWhiteFraction: f.paperWhiteFraction,
-          noteCoverage: _coverage(frontNote, f),
-        ),
-        ?PageDetector.rejection(
-          side: 'BACK',
-          aspectRatio: b.aspectRatio,
-          paperWhiteFraction: b.paperWhiteFraction,
-          noteCoverage: _coverage(backNote, b),
-        ),
-      ];
-      debugPrint('Paper check: front aspect ${f.aspectRatio.toStringAsFixed(2)} '
-          'white ${f.paperWhiteFraction.toStringAsFixed(2)}; back aspect '
-          '${b.aspectRatio.toStringAsFixed(2)} white '
-          '${b.paperWhiteFraction.toStringAsFixed(2)}');
-      // A note on printer paper is a photocopy / printout → FAKE.
-      // A page with no real note content (no confident note class and no
-      // security feature) is just "not a note" and falls through below.
-      if (paper.isNotEmpty &&
-          (_noteContent(frontDets) || _noteContent(backDets))) {
-        timings['total'] = lap(total);
-        return NoteAnalysisModel(
-          isBanknote: false,
-          banknoteConfidence: 0,
-          rejectionKind: 'photocopy',
-          rejectionReasons: paper,
-          timingsMs: timings,
-          detections: detections,
-        );
-      }
+      // The old A4/paper-shape heuristic was removed: it misfired on real
+      // notes. Non-notes (pages, printouts) are rejected below by YOLO
+      // feature evidence (NotePresence) instead.
+      debugPrint('Image shape: front ${f.aspectRatio.toStringAsFixed(2)} : 1, '
+          'back ${b.aspectRatio.toStringAsFixed(2)} : 1');
 
       // 1b. Half / partial note: the image shape must match the shape of the
       //     note YOLO sees (all notes are 65 mm tall, 8 mm longer per step).
@@ -445,6 +416,8 @@ class OnDeviceCurrencyVerificationRepository
       CounterfeitCnnModel? counterfeit;
       String? skipReason;
       String? rs5000Only;
+      CounterfeitCnnModel? smallCnn;
+      String? smallCnnSkipReason;
       if (isRs5000 && f5k != null && b5k != null) {
         sw = Stopwatch()..start();
         final cnn = await (_cnn ??= _load(Rs5000AnomalyClassifier.load, 'Rs 5,000 CNN'));
@@ -475,6 +448,34 @@ class OnDeviceCurrencyVerificationRepository
       } else {
         rs5000Only = 'Only for Rs 5,000 notes · this is '
             '${frontNote.cls.denomination == null ? 'another note' : 'Rs ${frontNote.cls.denomination}'}';
+
+        // Rs 10–1,000: separate MobileNetV3-Small genuine/fake classifier.
+        // Only when both sides agree on a supported denomination; it never
+        // runs for Rs 5,000. If it fails, report UNABLE TO VERIFY rather
+        // than treating the note as genuine.
+        final d = frontNote.cls.denomination;
+        if (d != null &&
+            d == backNote.cls.denomination &&
+            MobileNetV3SmallClassifier.supports(d)) {
+          sw = Stopwatch()..start();
+          try {
+            final small = await (_smallCnn ??= MobileNetV3SmallClassifier.load());
+            final pf = small.fakeProbability(f.cnnInput);
+            final pb = small.fakeProbability(b.cnnInput);
+            debugPrint('MobileNetV3-Small P(fake) Rs $d: front=$pf back=$pb');
+            smallCnn = CounterfeitCnnModel(
+              frontCounterfeit: pf,
+              backCounterfeit: pb,
+              model: MobileNetV3SmallClassifier.modelName,
+            );
+          } on Object catch (e) {
+            debugPrint('MobileNetV3-Small failed: $e');
+            _smallCnn = null; // allow a retry on the next scan
+            smallCnnSkipReason =
+                'The genuine/fake classifier could not run on this device';
+          }
+          timings['cnn_small'] = lap(sw);
+        }
       }
 
       timings['total'] = lap(total);
@@ -488,6 +489,8 @@ class OnDeviceCurrencyVerificationRepository
         anomaly: anomaly,
         anomalySkipReason: skipReason,
         counterfeitCnn: counterfeit,
+        smallCnn: smallCnn,
+        smallCnnSkipReason: smallCnnSkipReason,
         microprint: microprint,
         monument: bs.monumentModelAvailable
             ? MonumentResultModel(
@@ -531,16 +534,6 @@ class OnDeviceCurrencyVerificationRepository
             ),
         ],
       );
-
-  /// A confident note class (≥ 0.5) or any security-feature box. A page of
-  /// plain text can get a weak note class (0.48 seen) but never features.
-  static bool _noteContent(List<YoloDetection> dets) => dets.any((d) =>
-      (d.cls.isNote && d.score >= confirmThreshold) ||
-      NotePresence.featureClasses.contains(d.cls));
-
-  /// Share of the image covered by YOLO's best note box.
-  static double? _coverage(YoloDetection? note, PreparedImage img) =>
-      note == null ? null : (note.box.area / (img.width * img.height)).clamp(0.0, 1.0);
 
   static YoloDetection? _bestNote(List<YoloDetection> dets) =>
       dets.where((d) => d.cls.isNote).fold<YoloDetection?>(
@@ -595,6 +588,7 @@ class OnDeviceCurrencyVerificationRepository
     await (await _yolo)?.close();
     (await _cnn)?.close();
     (await _counterfeitCnn)?.close();
+    (await _smallCnn)?.close();
     (await _monument)?.close();
   }
 }

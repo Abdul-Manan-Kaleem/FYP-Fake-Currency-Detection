@@ -136,6 +136,14 @@ class VerificationEngine {
       _surface(analysis.anomaly, analysis.anomalySkipReason,
           analysis.rs5000OnlyReason),
       _counterfeitCnn(analysis.counterfeitCnn, analysis.rs5000OnlyReason),
+      // Rs 10–1,000 only; Rs 5,000 has its own two classifiers above, so it
+      // gets no row for this one.
+      if ((_agreedDenomination(front, back) ?? front.denomination) != 5000)
+        _smallCnn(
+          analysis.smallCnn,
+          analysis.smallCnnSkipReason,
+          _agreedDenomination(front, back) ?? front.denomination,
+        ),
       // Microprint is only checked on Rs 5,000 for now; other notes get no
       // microprint row at all.
       if (CurrencyRules.hasMicroprint(front.denomination))
@@ -224,7 +232,10 @@ class VerificationEngine {
         analysis.rs5000OnlyReason == null
             ? 'All YOLO11s security features and OCR serial checks passed, '
                 'and both Rs 5,000 CNNs found nothing wrong.'
-            : 'All YOLO11s security features and OCR serial checks passed.'
+            : analysis.smallCnn != null
+                ? 'All YOLO11s security features and OCR serial checks passed, '
+                    'and the genuine/fake CNN found nothing wrong.'
+                : 'All YOLO11s security features and OCR serial checks passed.'
       else if (failures.isEmpty)
         'Every check that could run passed.'
       else
@@ -873,6 +884,77 @@ class VerificationEngine {
         ),
         CheckDetailModel(
           label: 'Back P(counterfeit)',
+          value: c.backCounterfeit.toStringAsFixed(3),
+          ok: c.backCounterfeit < c.threshold,
+        ),
+        CheckDetailModel(
+          label: 'Threshold',
+          value: c.threshold.toStringAsFixed(2),
+        ),
+      ],
+    );
+  }
+
+  /// MobileNetV3-Small genuine/fake classifier for Rs 10–1,000. Supporting
+  /// evidence like the Rs 5,000 CNNs: a genuine-like score never overrides a
+  /// failed physical check, and a classifier that could not run is
+  /// "unable to verify", never an implicit pass.
+  FeatureCheckModel _smallCnn(
+    CounterfeitCnnModel? c,
+    String? skipReason,
+    int? denomination,
+  ) {
+    const title = 'Genuine/Fake (CNN)';
+    if (denomination == null || denomination == 5000) {
+      return _check(
+        id: FeatureCheckId.smallCnn,
+        title: title,
+        weight: ScoreWeights.smallCnn,
+        status: CheckStatus.notApplicable,
+        summary: denomination == 5000
+            ? 'Rs 5,000 uses its own two classifiers'
+            : 'Denomination unknown',
+      );
+    }
+    if (skipReason != null) {
+      return _check(
+        id: FeatureCheckId.smallCnn,
+        title: title,
+        weight: ScoreWeights.smallCnn,
+        status: CheckStatus.inconclusive,
+        summary: skipReason,
+      );
+    }
+    if (c == null) {
+      return _check(
+        id: FeatureCheckId.smallCnn,
+        title: title,
+        weight: ScoreWeights.smallCnn,
+        status: CheckStatus.skipped,
+        summary: 'Classifier did not run',
+      );
+    }
+
+    final ok = !c.flagsCounterfeit;
+    final p = c.counterfeitProbability;
+    return _check(
+      id: FeatureCheckId.smallCnn,
+      title: title,
+      weight: ScoreWeights.smallCnn,
+      status: ok ? CheckStatus.pass : CheckStatus.fail,
+      summary: ok
+          ? 'Classified genuine · P(fake) ${p.toStringAsFixed(2)}'
+          : 'Classified fake · P(fake) ${p.toStringAsFixed(2)}',
+      confidence: 1 - (p / c.threshold).clamp(0.0, 1.0) * (1 - _minConf),
+      details: [
+        CheckDetailModel(label: 'Model', value: c.model),
+        CheckDetailModel(
+          label: 'Front P(fake)',
+          value: c.frontCounterfeit.toStringAsFixed(3),
+          ok: c.frontCounterfeit < c.threshold,
+        ),
+        CheckDetailModel(
+          label: 'Back P(fake)',
           value: c.backCounterfeit.toStringAsFixed(3),
           ok: c.backCounterfeit < c.threshold,
         ),

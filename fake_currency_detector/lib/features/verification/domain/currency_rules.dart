@@ -89,6 +89,10 @@ abstract final class ScoreWeights {
   static const double printedYear = 5;
   static const double surfaceAnomaly = 10;
   static const double counterfeitCnn = 10;
+
+  /// MobileNetV3-Small genuine/fake check for Rs 10–1,000 (the Rs 5,000
+  /// notes use [counterfeitCnn] instead, so the two never both count).
+  static const double smallCnn = 10;
   static const double microprint = 5;
 
   /// Back-side monument. A confident mismatch also overrides the verdict to

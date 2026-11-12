@@ -7,6 +7,7 @@ enum FeatureCheckId {
   printedYear,
   surfaceAnomaly,
   counterfeitCnn,
+  smallCnn,
   microprint,
   monument,
 }

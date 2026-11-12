@@ -246,6 +246,8 @@ class NoteAnalysisModel {
     this.anomaly,
     this.anomalySkipReason,
     this.counterfeitCnn,
+    this.smallCnn,
+    this.smallCnnSkipReason,
     this.microprint,
     this.monument,
     this.rs5000OnlyReason,
@@ -266,6 +268,15 @@ class NoteAnalysisModel {
 
   /// Rs 5,000 genuine/counterfeit classifier output (second CNN).
   final CounterfeitCnnModel? counterfeitCnn;
+
+  /// MobileNetV3-Small genuine/fake output for Rs 10–1,000 (P(fake) per
+  /// side, stored in the same shape as [counterfeitCnn]).
+  final CounterfeitCnnModel? smallCnn;
+
+  /// Set when the Rs 10–1,000 classifier should have run but could not
+  /// (model missing or failed). The engine then reports UNABLE TO VERIFY
+  /// instead of silently treating the note as genuine.
+  final String? smallCnnSkipReason;
 
   /// Back-side monument check. Null when the analysis did not reach it.
   final MonumentResultModel? monument;
@@ -299,6 +310,8 @@ class NoteAnalysisModel {
         anomaly: anomaly,
         anomalySkipReason: anomalySkipReason,
         counterfeitCnn: counterfeitCnn,
+        smallCnn: smallCnn,
+        smallCnnSkipReason: smallCnnSkipReason,
         microprint: value,
         monument: monument,
         rs5000OnlyReason: rs5000OnlyReason,
@@ -327,6 +340,10 @@ class NoteAnalysisModel {
       counterfeitCnn: m(json['counterfeit_cnn']) == null
           ? null
           : CounterfeitCnnModel.fromJson(m(json['counterfeit_cnn'])!),
+      smallCnn: m(json['small_cnn']) == null
+          ? null
+          : CounterfeitCnnModel.fromJson(m(json['small_cnn'])!),
+      smallCnnSkipReason: json['small_cnn_skip_reason'] as String?,
       monument: m(json['monument']) == null
           ? null
           : MonumentResultModel.fromJson(m(json['monument'])!),
@@ -359,6 +376,8 @@ class NoteAnalysisModel {
         'anomaly': anomaly?.toJson(),
         'anomaly_skip_reason': anomalySkipReason,
         'counterfeit_cnn': counterfeitCnn?.toJson(),
+        'small_cnn': smallCnn?.toJson(),
+        'small_cnn_skip_reason': smallCnnSkipReason,
         'microprint': microprint?.toJson(),
         'monument': monument?.toJson(),
         'rs5000_only_reason': rs5000OnlyReason,

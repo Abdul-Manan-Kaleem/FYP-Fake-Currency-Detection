@@ -72,6 +72,7 @@ extension FeatureCheckIcon on FeatureCheckId {
         FeatureCheckId.printedYear => Icons.event_note_outlined,
         FeatureCheckId.surfaceAnomaly => Icons.blur_linear_rounded,
         FeatureCheckId.counterfeitCnn => Icons.psychology_outlined,
+        FeatureCheckId.smallCnn => Icons.verified_user_outlined,
         FeatureCheckId.microprint => Icons.zoom_in_rounded,
         FeatureCheckId.monument => Icons.account_balance_outlined,
       };

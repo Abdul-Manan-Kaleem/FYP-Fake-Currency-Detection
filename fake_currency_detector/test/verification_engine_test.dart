@@ -391,6 +391,87 @@ void main() {
     expect(mark.summary, 'Security dots: 2 of 2 counted');
   });
 
+  group('Rs 10–1,000 MobileNetV3-Small CNN', () {
+    const q = ImageQualityModel(blurScore: 0.1, glareScore: 0.05, brightness: 0.5);
+
+    // A clean Rs 100 whose physical checks all pass.
+    NoteAnalysisModel rs100({
+      CounterfeitCnnModel? small,
+      String? skip,
+      int denom = 100,
+    }) =>
+        NoteAnalysisModel(
+          isBanknote: true,
+          banknoteConfidence: 0.95,
+          front: SideDetectionModel(
+            quality: q,
+            denomination: denom,
+            denominationConfidence: 0.95,
+            sbpSeals: const FeatureDetectionModel(count: 1, confidence: 0.9),
+            securityThreads: const FeatureDetectionModel(count: 1, confidence: 0.9),
+            securityLines: const FeatureDetectionModel(count: 3, confidence: 0.9),
+            securityDots: const FeatureDetectionModel(count: 0, confidence: 1),
+            printedYear: const PrintedYearModel(
+                detected: true, value: '2022', confidence: 0.9),
+            serialNumbers: const [
+              SerialReadModel(text: 'AK4718263', confidence: 0.9),
+              SerialReadModel(text: 'AK4718263', confidence: 0.9),
+            ],
+          ),
+          back: SideDetectionModel(
+            quality: q,
+            denomination: denom,
+            denominationConfidence: 0.95,
+            sbpSeals: const FeatureDetectionModel(count: 3, confidence: 0.9),
+          ),
+          rs5000OnlyReason: 'Only for Rs 5,000 notes',
+          smallCnn: small,
+          smallCnnSkipReason: skip,
+        );
+
+    FeatureCheckModel small(VerificationResultModel r) =>
+        r.checks.firstWhere((c) => c.id == FeatureCheckId.smallCnn);
+    bool hasSmall(VerificationResultModel r) =>
+        r.checks.any((c) => c.id == FeatureCheckId.smallCnn);
+
+    test('genuine-like on both sides → passes', () {
+      final r = engine.evaluate(rs100(
+          small: const CounterfeitCnnModel(
+              frontCounterfeit: 0.04, backCounterfeit: 0.1)));
+      expect(small(r).status, CheckStatus.pass);
+      expect(r.verdict, VerificationVerdict.real);
+    });
+
+    test('fake ≥ 0.5 on either side → fails, never PASSED', () {
+      final r = engine.evaluate(rs100(
+          small: const CounterfeitCnnModel(
+              frontCounterfeit: 0.04, backCounterfeit: 0.93)));
+      expect(small(r).status, CheckStatus.fail);
+      expect(r.verdict, VerificationVerdict.suspicious);
+    });
+
+    test('classifier could not run → UNABLE TO VERIFY, not a pass', () {
+      final r = engine.evaluate(rs100(skip: 'could not run'));
+      expect(small(r).status, CheckStatus.inconclusive);
+      expect(r.verdict, VerificationVerdict.unableToVerify);
+    });
+
+    test('Rs 5,000 never uses the small classifier', () {
+      final r = engine.evaluate(rs100(denom: 5000));
+      expect(hasSmall(r), isFalse);
+    });
+
+    test('JSON round trip keeps the output and skip reason', () {
+      final a = NoteAnalysisModel.fromJson(rs100(
+              small: const CounterfeitCnnModel(
+                  frontCounterfeit: 0.2, backCounterfeit: 0.3),
+              skip: 'x')
+          .toJson());
+      expect(a.smallCnn!.backCounterfeit, closeTo(0.3, 1e-9));
+      expect(a.smallCnnSkipReason, 'x');
+    });
+  });
+
   group('Rs 5,000 genuine/counterfeit CNN', () {
     const q = ImageQualityModel(blurScore: 0.1, glareScore: 0.05, brightness: 0.5);
     NoteAnalysisModel rs5000({
