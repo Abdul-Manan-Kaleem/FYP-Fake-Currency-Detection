@@ -7,8 +7,7 @@ plugins {
 android {
     namespace = "com.fyp.fake_currency_detector"
     compileSdk = flutter.compileSdkVersion
-    // Pinned to the NDK installed locally; flutter.ndkVersion (28.2) is not present.
-    ndkVersion = "30.0.16248370"
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
