@@ -148,7 +148,7 @@ class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
                       ),
                       const SizedBox(height: 6),
                       _EngineChip(
-                        label: 'ON-DEVICE · YOLO11s + ML Kit OCR + Rs 5,000 CNN',
+                        label: 'ON-DEVICE · YOLO11s + ML Kit OCR + CNN classifiers',
                       ),
                       const Spacer(),
                       const RadarScanner(size: 230),
