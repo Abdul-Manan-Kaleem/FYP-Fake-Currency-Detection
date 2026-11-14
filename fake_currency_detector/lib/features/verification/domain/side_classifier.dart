@@ -7,11 +7,17 @@ class SideCheck {
     required this.side,
     this.noteDenomination,
     this.monumentDenomination,
+    this.looksLikeNote = true,
   });
 
   static const unknown = SideCheck(side: DetectedSide.unknown);
 
   final DetectedSide side;
+
+  /// False when the image shows no banknote at all (no note class or no
+  /// security feature found). Defaults to true so a failed check never blocks
+  /// capture; the full analysis still decides later.
+  final bool looksLikeNote;
 
   /// Denomination YOLO11s reads on this side (confident only).
   final int? noteDenomination;

@@ -7,6 +7,7 @@ import '../../../../core/widgets/cyber_background.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/neon_button.dart';
 import '../../../verification/presentation/screens/analyzing_screen.dart';
+import '../../../verification/presentation/widgets/note_identity_banner.dart';
 import '../../domain/capture_models.dart';
 import '../controllers/capture_controller.dart';
 import '../widgets/flip_prompt.dart';
@@ -345,7 +346,10 @@ class _FlipStepView extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 14),
+          // The first photo was accepted as a banknote: say which value.
+          NoteIdentityBanner(frontValue: front?.denomination, compact: true),
+          const SizedBox(height: 18),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: FlipPrompt(front: front),
@@ -504,19 +508,27 @@ class _SideErrorDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       child: GlassContainer(
         borderRadius: 24,
-        glowColor: AppColors.amber,
-        borderColor: AppColors.amber.withValues(alpha: 0.5),
+        glowColor: error.notBanknote ? AppColors.crimson : AppColors.amber,
+        borderColor: (error.notBanknote ? AppColors.crimson : AppColors.amber)
+            .withValues(alpha: 0.5),
         fill: AppColors.surface.withValues(alpha: 0.95),
         padding: const EdgeInsets.all(22),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.flip_rounded, color: AppColors.amber, size: 44),
+            Icon(
+              error.notBanknote
+                  ? Icons.do_not_disturb_alt_rounded
+                  : Icons.flip_rounded,
+              color: error.notBanknote ? AppColors.crimson : AppColors.amber,
+              size: 44,
+            ),
             const SizedBox(height: 12),
-            const Text(
-              'GALAT SIDE · WRONG SIDE',
+            Text(
+              error.title,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.amber,
+                color: error.notBanknote ? AppColors.crimson : AppColors.amber,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2,
                 fontSize: 15,

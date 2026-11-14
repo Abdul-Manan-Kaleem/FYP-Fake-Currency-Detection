@@ -43,6 +43,20 @@ class CaptureController extends Notifier<CaptureState> {
         busyMessage: 'Note ki side check ho rahi hai… · Checking side',
       );
       final check = await _checkSide(result.path);
+
+      // Not a banknote at all: say so on the very first image and do not move
+      // on to the next step.
+      if (!check.looksLikeNote) {
+        _forget([result.path]);
+        await Haptics.alert();
+        state = state.copyWith(
+          busy: false,
+          sideError: SideError.notABanknote,
+          clearBusyMessage: true,
+        );
+        return;
+      }
+
       final problem = _sideProblem(side, check);
       if (problem != null) {
         _forget([result.path]);

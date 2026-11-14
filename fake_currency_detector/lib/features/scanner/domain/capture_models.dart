@@ -90,10 +90,34 @@ class CaptureState {
 
 /// Wrong-side message, in Roman Urdu with an English line.
 class SideError {
-  const SideError({required this.urdu, required this.english});
+  const SideError({
+    required this.urdu,
+    required this.english,
+    this.title = 'GALAT SIDE · WRONG SIDE',
+    this.notBanknote = false,
+  });
 
   final String urdu;
   final String english;
+
+  /// Heading of the pop-up.
+  final String title;
+
+  /// True when the photograph shows no banknote at all (different icon and
+  /// colour in the pop-up).
+  final bool notBanknote;
+
+  /// The photograph is not a banknote: shown right after the first photo, so
+  /// the user is never asked for the back of something that is not a note.
+  static const notABanknote = SideError(
+    title: 'INVALID IMAGE · NOT A NOTE',
+    notBanknote: true,
+    urdu: 'Ye Pakistani note ki tasveer nahi hai. Poora note saaf roshni me, '
+        'sadi surface par rakh kar dobara scan karen.',
+    english: 'This is not an image of a Pakistani banknote, so it was not '
+        'accepted. Place the whole note flat on a plain surface in good light '
+        'and scan it again.',
+  );
 
   static const backOnFront = SideError(
     urdu: 'Ye note ki back side hai! Barah-e-meherbani pehle front side '

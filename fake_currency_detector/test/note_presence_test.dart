@@ -46,6 +46,28 @@ void main() {
     );
   });
 
+  group('looksLikeNote (checked right after the first photo)', () {
+    test('striped graphic seen as a note class but no feature → not a note', () {
+      expect(NotePresence.looksLikeNote([d(YoloClass.rs500, 0.786)]), isFalse);
+    });
+
+    test('nothing detected → not a note', () {
+      expect(NotePresence.looksLikeNote(const []), isFalse);
+    });
+
+    test('features without any note class → not a note', () {
+      expect(NotePresence.looksLikeNote([d(YoloClass.sbpSeal, 0.9)]), isFalse);
+    });
+
+    test('note class plus one feature → looks like a note', () {
+      expect(
+        NotePresence.looksLikeNote(
+            [d(YoloClass.rs100, 0.9), d(YoloClass.sbpSeal, 0.6)]),
+        isTrue,
+      );
+    });
+  });
+
   test('back with note class and seals passes', () {
     expect(
       NotePresence.rejection(

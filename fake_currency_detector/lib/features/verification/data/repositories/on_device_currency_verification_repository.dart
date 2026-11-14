@@ -139,6 +139,12 @@ class OnDeviceCurrencyVerificationRepository
           m != null && m.confidence >= NoteSideRules.monumentConfidence
               ? m.denomination
               : null,
+      // A confident monument also proves it is a note, even if YOLO found
+      // no seal on a worn back.
+      looksLikeNote: NotePresence.looksLikeNote(scan.detections) ||
+          (m != null &&
+              m.denomination != null &&
+              m.confidence >= NoteSideRules.monumentConfidence),
     );
     debugPrint('Side check $imagePath → $side, note ${check.noteDenomination}, '
         'monument ${check.monumentDenomination}');

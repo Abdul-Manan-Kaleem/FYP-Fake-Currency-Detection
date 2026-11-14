@@ -20,6 +20,7 @@ import '../controllers/verification_controller.dart';
 import '../widgets/confidence_gauge.dart';
 import '../widgets/detection_overlay.dart';
 import '../widgets/inspection_tile.dart';
+import '../widgets/note_identity_banner.dart';
 import '../widgets/verdict_badge.dart';
 import '../widgets/verdict_style.dart';
 
@@ -78,6 +79,13 @@ class ResultsScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
               children: [
+                // First thing the user sees: is it a Pakistani note, and
+                // which value.
+                NoteIdentityBanner(
+                  frontValue: result.analysis?.front?.denomination,
+                  backValue: result.analysis?.back?.denomination,
+                ),
+                const SizedBox(height: 12),
                 Center(
                   child: ConfidenceGauge(
                     percentage: result.confidence.percentage,
@@ -105,11 +113,6 @@ class ResultsScreen extends ConsumerWidget {
                         ),
                   const SizedBox(height: 16),
                 ],
-                if (result.denomination != null)
-                  _DenominationReadout(
-                    value: result.denomination!,
-                    color: color,
-                  ),
                 const SizedBox(height: 16),
                 _SummaryCard(result: result),
                 if (!inconclusive &&
@@ -141,6 +144,38 @@ class ResultsScreen extends ConsumerWidget {
                     denomination: result.denomination ?? 0,
                     summary: microprintCheck.summary,
                   ),
+                ],
+                // The analysed photographs with a mark on everything the
+                // detector found.
+                if (result.analysis?.detections.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 24),
+                  const _SectionHeader(title: 'WHAT WE FOUND ON YOUR NOTE'),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Each box marks something the scanner found: the note '
+                    'value, SBP seals, serial numbers, the printed year, the '
+                    'security thread and the lines or dots. The chips list '
+                    'how many of each were found.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  for (final (key, label, path) in [
+                    ('front', 'FRONT', frontImagePath),
+                    ('back', 'BACK', backImagePath),
+                  ])
+                    if (result.analysis!.detections[key] case final d?)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: DetectionOverlayCard(
+                          side: label,
+                          imagePath: path,
+                          detections: d,
+                        ),
+                      ),
                 ],
                 if (result.checks.isNotEmpty) ...[
                   const SizedBox(height: 24),
@@ -192,20 +227,6 @@ class ResultsScreen extends ConsumerWidget {
                       style: Theme.of(context).textTheme.labelSmall,
                     ),
                     children: [
-                      if (result.analysis?.detections.isNotEmpty ?? false)
-                        for (final (key, label, path) in [
-                          ('front', 'FRONT', frontImagePath),
-                          ('back', 'BACK', backImagePath),
-                        ])
-                          if (result.analysis!.detections[key] case final d?)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: DetectionOverlayCard(
-                                side: label,
-                                imagePath: path,
-                                detections: d,
-                              ),
-                            ),
                       Text(
                         'Engine: ${result.source.toUpperCase()} · '
                         'Raw score ${result.confidence.rawScore.toStringAsFixed(1)} · '
@@ -484,38 +505,6 @@ class _FakeBanner extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _DenominationReadout extends StatelessWidget {
-  const _DenominationReadout({required this.value, required this.color});
-
-  final int value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          formatRupees(value),
-          style: TextStyle(
-            fontSize: 40,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1,
-            color: AppColors.textPrimary,
-            shadows: [
-              Shadow(color: color.withValues(alpha: 0.5), blurRadius: 20),
-            ],
-          ),
-        ),
-        Text(
-          'PAKISTANI RUPEES',
-          style: Theme.of(context).textTheme.labelSmall
-              ?.copyWith(letterSpacing: 4),
-        ),
-      ],
     );
   }
 }

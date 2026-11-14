@@ -19,6 +19,14 @@ abstract final class NotePresence {
     YoloClass.securityDots,
   };
 
+  /// Quick check used right after the first photo: does the image show a
+  /// banknote at all? True when YOLO sees a note class and at least one
+  /// security feature. A page, a face or a random object fails, so the user
+  /// is told straight away instead of being asked for the back side.
+  static bool looksLikeNote(List<YoloDetection> detections) =>
+      detections.any((d) => d.cls.isNote) &&
+      detections.any((d) => featureClasses.contains(d.cls));
+
   static const int minFrontFeatureTypes = 2;
   static const int minBackFeatureTypes = 1;
 
