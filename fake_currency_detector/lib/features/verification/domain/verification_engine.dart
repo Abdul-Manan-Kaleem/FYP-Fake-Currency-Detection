@@ -138,7 +138,9 @@ class VerificationEngine {
       _counterfeitCnn(analysis.counterfeitCnn, analysis.rs5000OnlyReason),
       // Rs 10–1,000 only; Rs 5,000 has its own two classifiers above, so it
       // gets no row for this one.
-      if ((_agreedDenomination(front, back) ?? front.denomination) != 5000)
+      // Switched off for now (kSmallCnnEnabled): the row disappears too.
+      if (kSmallCnnEnabled &&
+          (_agreedDenomination(front, back) ?? front.denomination) != 5000)
         _smallCnn(
           analysis.smallCnn,
           analysis.smallCnnSkipReason,

@@ -1,6 +1,10 @@
 /// Pakistani currency verification rules (see CURRENCY_RULES).
 enum DenominationMark { none, lines, dots }
 
+/// MobileNetV3-Small genuine/fake classifier (Rs 10-1,000). Switched off for
+/// now: it does not run and its row is not shown. Set to true to bring it back.
+const bool kSmallCnnEnabled = false;
+
 class DenominationSpec {
   const DenominationSpec(
     this.value, {
@@ -93,6 +97,7 @@ abstract final class ScoreWeights {
   /// MobileNetV3-Small genuine/fake check for Rs 10–1,000 (the Rs 5,000
   /// notes use [counterfeitCnn] instead, so the two never both count).
   static const double smallCnn = 10;
+  // (see kSmallCnnEnabled below)
   static const double microprint = 5;
 
   /// Back-side monument. A confident mismatch also overrides the verdict to

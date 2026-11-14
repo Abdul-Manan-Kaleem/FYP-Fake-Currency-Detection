@@ -2,6 +2,8 @@ import 'package:fake_currency_detector/features/verification/data/models/feature
 import 'package:fake_currency_detector/features/verification/data/models/note_analysis_model.dart';
 import 'package:fake_currency_detector/features/verification/data/models/verification_result_model.dart';
 import 'fixtures/sample_analyses.dart';
+import 'package:fake_currency_detector/features/verification/domain/currency_rules.dart'
+    show kSmallCnnEnabled;
 import 'package:fake_currency_detector/features/verification/domain/verification_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -391,7 +393,8 @@ void main() {
     expect(mark.summary, 'Security dots: 2 of 2 counted');
   });
 
-  group('Rs 10–1,000 MobileNetV3-Small CNN', () {
+  group('Rs 10–1,000 MobileNetV3-Small CNN',
+      skip: kSmallCnnEnabled ? false : 'MobileNetV3-Small switched off', () {
     const q = ImageQualityModel(blurScore: 0.1, glareScore: 0.05, brightness: 0.5);
 
     // A clean Rs 100 whose physical checks all pass.

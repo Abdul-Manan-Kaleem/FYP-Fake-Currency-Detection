@@ -460,7 +460,8 @@ class OnDeviceCurrencyVerificationRepository
         // runs for Rs 5,000. If it fails, report UNABLE TO VERIFY rather
         // than treating the note as genuine.
         final d = frontNote.cls.denomination;
-        if (d != null &&
+        if (kSmallCnnEnabled &&
+            d != null &&
             d == backNote.cls.denomination &&
             MobileNetV3SmallClassifier.supports(d)) {
           sw = Stopwatch()..start();
