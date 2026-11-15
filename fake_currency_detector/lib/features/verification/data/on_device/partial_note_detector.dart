@@ -1,3 +1,9 @@
+/// Partial-note check based on the photo's shape.
+///
+/// In: the image's aspect ratio (long edge / short edge) and YOLO's best
+/// denomination and score. Out: a reason text if the note looks cut off,
+/// otherwise null. No model: it compares against known note sizes.
+///
 /// Detects a half / partial note (or a crop with lots of background) from the
 /// shape of the image, so only whole notes are analysed.
 ///
@@ -20,13 +26,17 @@ abstract final class PartialNoteDetector {
 
   /// Allowed deviation from the note's real shape. A little background in a
   /// manual crop stays inside this; a missing quarter or half does not.
+  /// Below 80% of the expected aspect ratio = part of the note is missing.
   static const double tooShortFactor = 0.80;
+
+  /// Above 120% of the expected aspect ratio = top or bottom cut off.
   static const double tooLongFactor = 1.20;
 
   /// Used when YOLO is not sure of the denomination (< 0.5).
   static const double genericMinAspect = 1.60;
   static const double genericMaxAspect = 2.90;
 
+  /// Advice lines shown to the user when a side is rejected.
   static const List<String> guidance = [
     'What to do:',
     '1. Make sure the WHOLE note is in the photo: all four corners visible.',
@@ -35,6 +45,8 @@ abstract final class PartialNoteDetector {
     '4. Scan again: front first, then the back.',
   ];
 
+  /// Real length / height of [denomination] (e.g. 163 / 65 for Rs 5,000),
+  /// or null if the denomination is unknown.
   static double? expectedAspect(int? denomination) {
     final size = noteSizesMm[denomination];
     return size == null ? null : size.$1 / size.$2;
@@ -50,6 +62,8 @@ abstract final class PartialNoteDetector {
     int? denomination,
     double noteScore = 0,
   }) {
+    // Step 1: trust the denomination only if YOLO is at least 50% sure;
+    // otherwise use the wide generic range.
     final expected = noteScore >= 0.5 ? expectedAspect(denomination) : null;
     final min = expected != null ? expected * tooShortFactor : genericMinAspect;
     final max = expected != null ? expected * tooLongFactor : genericMaxAspect;
@@ -58,6 +72,7 @@ abstract final class PartialNoteDetector {
         ? 'a whole note is about 1.8–2.5 : 1'
         : 'a whole Rs $denomination is about ${expected.toStringAsFixed(2)} : 1';
 
+    // Step 2: too square = half a note; too long and thin = a cut-off strip.
     if (aspectRatio < min) {
       return '$side: only part of the note is in the image (half or cut off). '
           'Image shape $shape, $full';

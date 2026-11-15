@@ -1,3 +1,12 @@
+/// Checks the tiny repeated denomination text along a Rs 5,000 note border.
+///
+/// In: the denomination YOLO found plus OCR text read from edge-strip or
+/// close-up images. Out: a [MicroprintModel] with how many times the
+/// expected number appeared (and any conflicting number).
+/// Uses Google ML Kit text recognition (OCR = reading text from pictures);
+/// no model of our own.
+library;
+
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
@@ -10,6 +19,7 @@ import 'note_text_parser.dart';
 /// the expected text is the denomination YOLO11s detected, so OCR only has to
 /// find it repeated.
 abstract final class MicroprintRules {
+  /// Repeats of the expected value needed to pass (set in CurrencyRules).
   static const int minOccurrences = CurrencyRules.microprintMinOccurrences;
 
   /// Values whose repetition on the border would contradict the detected
@@ -19,18 +29,24 @@ abstract final class MicroprintRules {
   /// Counts the expected value and any clearly conflicting denomination in
   /// OCR text. Text is digit-normalised and spaces removed, because repeated
   /// microprint is often read as one long run ("500050005000").
+  ///
+  /// [expected] is the denomination, [texts] the OCR results, [source] a
+  /// label for where the text came from (used in logs/results).
   static MicroprintModel evaluate(
     int expected,
     List<String> texts, {
     required String source,
   }) {
+    // Step 1: keep only digits (fixing look-alike letters) and join all
+    // texts with '|' so counts cannot span two separate images.
     final digits = [
       for (final t in texts)
         NoteTextParser.fixDigits(t.toUpperCase()).replaceAll(RegExp('[^0-9]'), ''),
     ].join('|');
 
+    // Step 2: count the expected value.
     final found = _count(digits, '$expected');
-    // A conflicting value must not be a substring of the expected one
+    // Step 3: look for a conflicting denomination. A conflicting value must not be a substring of the expected one
     // (every "5000" contains "500"), and only counts when the expected value
     // is absent.
     int? conflict;
@@ -46,6 +62,7 @@ abstract final class MicroprintRules {
       }
     }
 
+    // Step 4: build the result; the sample (first 48 chars) is for display.
     final sample = digits.replaceAll('|', ' ').trim();
     return MicroprintModel(
       expected: expected,
@@ -72,6 +89,9 @@ abstract final class MicroprintRules {
 class MicroprintReader {
   const MicroprintReader();
 
+  /// Runs OCR on each image in [imagePaths] and scores the result with
+  /// [MicroprintRules.evaluate]. [expected] is the denomination; [source]
+  /// names the image type. Stops early once enough repeats are found.
   Future<MicroprintModel> read(
     int expected,
     List<String> imagePaths, {

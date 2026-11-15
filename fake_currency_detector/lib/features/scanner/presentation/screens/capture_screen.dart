@@ -15,10 +15,17 @@ import '../widgets/holo_preview_card.dart';
 import '../widgets/scanner_hud.dart';
 import '../widgets/step_indicator.dart';
 
-/// Guided two-sided capture: FRONT → flip → BACK → dual preview staging.
+/// Main capture screen of the app (the scanner part of the flow).
+///
+/// It guides the user through: scan FRONT -> flip note -> scan BACK ->
+/// review both photos -> press Analyze (opens AnalyzingScreen).
+/// The current step and the photos live in captureControllerProvider;
+/// this screen only shows the right view for the current step.
 class CaptureScreen extends ConsumerWidget {
   const CaptureScreen({super.key});
 
+  /// Opens the analysis screen with the captured front and back photos.
+  /// The back can be null when the user chose "Analyze front only".
   void _analyze(BuildContext context, CaptureState s) {
     Navigator.of(context).push(
       CyberRoute(builder: (_) => AnalyzingScreen(front: s.front, back: s.back)),
@@ -27,6 +34,8 @@ class CaptureScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Listener 1: wrong side / not a banknote -> show a pop-up dialog once,
+    // then clear the error so it does not show again.
     ref.listen(captureControllerProvider.select((s) => s.sideError),
         (_, sideError) {
       if (sideError == null) return;
@@ -38,6 +47,8 @@ class CaptureScreen extends ConsumerWidget {
       );
     });
 
+    // Listener 2: general capture error -> snackbar. If a side is waiting,
+    // the snackbar offers "USE BASIC CAMERA" (and stays longer: 10s vs 4s).
     ref.listen(captureControllerProvider.select((s) => s.error), (_, error) {
       if (error == null) return;
       final notifier = ref.read(captureControllerProvider.notifier);
@@ -58,6 +69,8 @@ class CaptureScreen extends ConsumerWidget {
     final state = ref.watch(captureControllerProvider);
     final controller = ref.read(captureControllerProvider.notifier);
 
+    // Pick the view for the current step: front/back share one view,
+    // then the flip prompt, then the final review.
     final Widget body = switch (state.step) {
       CaptureStep.front || CaptureStep.back => _CaptureStepView(
           key: ValueKey(state.step),
@@ -97,6 +110,7 @@ class CaptureScreen extends ConsumerWidget {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
+      // Top bar: title, plus a "start over" button after the first step.
       appBar: AppBar(
         title: const Text('FAKE CURRENCY DETECTOR'),
         leading: state.step == CaptureStep.front
@@ -113,8 +127,10 @@ class CaptureScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
             child: Column(
               children: [
+                // Progress dots at the top.
                 StepIndicator(state: state),
                 const SizedBox(height: 20),
+                // Step content, with a fade + slide when the step changes.
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 420),
@@ -141,6 +157,8 @@ class CaptureScreen extends ConsumerWidget {
     );
   }
 
+  /// Bottom sheet asking how to retake one side: camera or gallery.
+  /// Closing the sheet without choosing does nothing.
   Future<void> _showRetakeSheet(
     BuildContext context,
     WidgetRef ref,
@@ -191,6 +209,11 @@ class CaptureScreen extends ConsumerWidget {
 
 // -----------------------------------------------------------------------------
 
+/// View for the FRONT or BACK scan step.
+///
+/// The user sees instructions, the scanner frame, a SCAN button and an
+/// "Upload from gallery" button. On the back step there are also "Back"
+/// and "Analyze front only" links. Buttons are disabled while [busy].
 class _CaptureStepView extends StatelessWidget {
   const _CaptureStepView({
     super.key,
@@ -203,12 +226,21 @@ class _CaptureStepView extends StatelessWidget {
     this.onBackToFront,
   });
 
+  /// Which side of the note this step is capturing.
   final NoteSide side;
+
+  /// True while a photo is being captured or processed.
   final bool busy;
+
+  /// Progress text shown under the frame while busy.
   final String? busyMessage;
   final ValueChanged<NoteSide> onScan;
   final ValueChanged<NoteSide> onGallery;
+
+  /// Only set on the back step: skip the back and analyze the front alone.
   final VoidCallback? onSkipBack;
+
+  /// Only set on the back step: go to the previous step.
   final VoidCallback? onBackToFront;
 
   @override
@@ -218,6 +250,7 @@ class _CaptureStepView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Instruction card (step number and what to do).
           _InstructionHud(
             stepLabel: 'STEP ${isFront ? 1 : 2} / 2',
             text: 'Align ${side.label} of Pakistani Note within frame',
@@ -226,7 +259,9 @@ class _CaptureStepView extends StatelessWidget {
                 'cropped away.',
           ),
           const SizedBox(height: 22),
+          // Scanner frame (tapping it also starts a scan).
           ScannerHud(side: side, busy: busy, onTap: () => onScan(side)),
+          // Progress message while busy.
           if (busy && busyMessage != null) ...[
             const SizedBox(height: 10),
             Text(
@@ -236,6 +271,7 @@ class _CaptureStepView extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 26),
+          // Main actions: scan with camera, or pick from gallery.
           NeonButton(
             label: 'SCAN ${side.label}',
             icon: Icons.document_scanner_outlined,
@@ -247,6 +283,7 @@ class _CaptureStepView extends StatelessWidget {
             icon: Icons.photo_library_outlined,
             onPressed: busy ? null : () => onGallery(side),
           ),
+          // Navigation links (back step only).
           if (onBackToFront != null || onSkipBack != null) ...[
             const SizedBox(height: 10),
             Row(
@@ -276,6 +313,7 @@ class _CaptureStepView extends StatelessWidget {
   }
 }
 
+/// Glowing card with the step label ("STEP 1 / 2"), a headline and a hint.
 class _InstructionHud extends StatelessWidget {
   const _InstructionHud({
     required this.stepLabel,
@@ -314,6 +352,10 @@ class _InstructionHud extends StatelessWidget {
   }
 }
 
+/// View shown after the front is accepted: asks the user to flip the note.
+///
+/// The user sees the detected denomination, an animated flip prompt, and
+/// two buttons: scan the back with the camera, or upload it from gallery.
 class _FlipStepView extends StatelessWidget {
   const _FlipStepView({
     super.key,
@@ -322,8 +364,13 @@ class _FlipStepView extends StatelessWidget {
     required this.onContinueGallery,
   });
 
+  /// The accepted front photo (used for the preview and denomination).
   final CapturedImage? front;
+
+  /// Scan the back with the camera.
   final VoidCallback onContinue;
+
+  /// Pick the back from the gallery.
   final VoidCallback onContinueGallery;
 
   @override
@@ -333,6 +380,7 @@ class _FlipStepView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 8),
+          // "Front captured" confirmation.
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -350,11 +398,13 @@ class _FlipStepView extends StatelessWidget {
           // The first photo was accepted as a banknote: say which value.
           NoteIdentityBanner(frontValue: front?.denomination, compact: true),
           const SizedBox(height: 18),
+          // Animated card that flips from front to back.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: FlipPrompt(front: front),
           ),
           const SizedBox(height: 36),
+          // Instruction text.
           Text(
             'Now flip the banknote to the BACK side',
             textAlign: TextAlign.center,
@@ -368,6 +418,7 @@ class _FlipStepView extends StatelessWidget {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 32),
+          // Actions for the back side.
           NeonButton(
             label: 'SCAN BACK',
             icon: Icons.flip_to_back_rounded,
@@ -386,6 +437,11 @@ class _FlipStepView extends StatelessWidget {
   }
 }
 
+/// Final step: shows both photos side by side before analysis.
+///
+/// The user can retake either side (refresh button on its card) or press
+/// "ANALYZE BANKNOTE". The button is off until both sides are captured
+/// and nothing is busy.
 class _ReviewStepView extends StatelessWidget {
   const _ReviewStepView({
     super.key,
@@ -398,6 +454,8 @@ class _ReviewStepView extends StatelessWidget {
   final ValueChanged<NoteSide> onRetake;
   final VoidCallback onAnalyze;
 
+  /// Names of the checks shown as chips under "PIPELINE". Display only;
+  /// the real checks run later on the analyzing screen.
   static const _checks = [
     'Denomination',
     'Serial OCR',
@@ -423,6 +481,7 @@ class _ReviewStepView extends StatelessWidget {
                 Text('Both sides staged',
                     style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 20),
+                // Front and back preview cards, side by side.
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -444,6 +503,7 @@ class _ReviewStepView extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 24),
+                // Card listing the checks that will run.
                 GlassContainer(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,6 +544,7 @@ class _ReviewStepView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        // Pinned at the bottom; starts the analysis.
         NeonButton(
           label: 'ANALYZE BANKNOTE',
           icon: Icons.radar_rounded,
@@ -495,7 +556,9 @@ class _ReviewStepView extends StatelessWidget {
   }
 }
 
-/// Wrong side scanned: Urdu first, English below, one button.
+/// Pop-up shown when the scanned photo is rejected (wrong side, or not a
+/// banknote). Urdu text first, English below, one OK button.
+/// Red is used when it is not a banknote, amber for a wrong side.
 class _SideErrorDialog extends StatelessWidget {
   const _SideErrorDialog({required this.error});
 

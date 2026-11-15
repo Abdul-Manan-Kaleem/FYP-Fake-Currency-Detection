@@ -1,3 +1,9 @@
+/// Radar scanner: a rotating radar sweep with blips, used as a loading visual.
+///
+/// Shown in the middle of analyzing_screen.dart while the note is checked.
+/// Input: optional size and colour (defaults to 220 and cyan).
+library;
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,24 +11,32 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 
 /// Rotating radar sweep with fading blips, shown while the engine works.
+///
+/// [size] is the width and height. [color] tints the rings, beam and blips.
 class RadarScanner extends StatefulWidget {
   const RadarScanner({super.key, this.size = 220, this.color = AppColors.cyan});
 
+  /// Width and height of the radar in logical pixels.
   final double size;
+
+  /// Main colour of the radar.
   final Color color;
 
   @override
   State<RadarScanner> createState() => _RadarScannerState();
 }
 
+/// Owns the animation controller that turns the beam.
 class _RadarScannerState extends State<RadarScanner>
     with SingleTickerProviderStateMixin {
+  // One full turn every 2.4 seconds, repeating forever.
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2400),
   )..repeat();
 
   // Fixed pseudo-random blip positions (angle, radius fraction).
+  // A seeded Random keeps the same layout every time.
   static final List<(double, double)> _blips = List.generate(9, (i) {
     final r = math.Random(i * 7919);
     return (r.nextDouble() * 2 * math.pi, 0.25 + r.nextDouble() * 0.65);
@@ -52,6 +66,10 @@ class _RadarScannerState extends State<RadarScanner>
   }
 }
 
+/// Draws the rings, glow, sweep beam and blips.
+///
+/// [angle] is the beam angle in radians, [color] the main colour, [blips]
+/// the (angle, distance fraction) of each dot.
 class _RadarPainter extends CustomPainter {
   _RadarPainter({required this.angle, required this.color, required this.blips});
 
@@ -64,6 +82,7 @@ class _RadarPainter extends CustomPainter {
     final c = size.center(Offset.zero);
     final r = size.shortestSide / 2;
 
+    // Grid: 4 circles plus a cross through the centre.
     final ring = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
@@ -85,7 +104,8 @@ class _RadarPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
 
-    // Sweep wedge.
+    // Sweep wedge: the canvas is rotated by the beam angle, then a fading
+    // gradient (brightest at its end) and a bright line are drawn.
     final rect = Rect.fromCircle(center: c, radius: r);
     canvas.save();
     canvas.translate(c.dx, c.dy);
@@ -116,6 +136,8 @@ class _RadarPainter extends CustomPainter {
     canvas.restore();
 
     // Blips light up as the beam passes and then fade out.
+    // delta = how far the beam has moved past the blip (0 to 2π); the blip
+    // fades to nothing after about 1.2π (216°).
     for (final (a, f) in blips) {
       var delta = (angle - a) % (2 * math.pi);
       if (delta < 0) delta += 2 * math.pi;
@@ -132,9 +154,11 @@ class _RadarPainter extends CustomPainter {
       canvas.drawCircle(p, 2.4, Paint()..color = color.withValues(alpha: alpha));
     }
 
+    // Centre dot.
     canvas.drawCircle(c, 4, Paint()..color = color);
   }
 
+  // Repaint only when the beam has moved.
   @override
   bool shouldRepaint(covariant _RadarPainter old) => old.angle != angle;
 }

@@ -1,3 +1,8 @@
+/// Animated "scanner" effect: a glowing line moving up and down over a widget.
+///
+/// Shown over the camera or note image to suggest that scanning is happening.
+library;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -12,17 +17,26 @@ class LaserSweep extends StatefulWidget {
     this.active = true,
   });
 
+  /// The widget the laser moves over.
   final Widget child;
+
+  /// Colour of the laser line.
   final Color color;
+
+  /// Time for one trip from top to bottom.
   final Duration duration;
+
+  /// When false, the laser is hidden and the animation is stopped.
   final bool active;
 
   @override
   State<LaserSweep> createState() => _LaserSweepState();
 }
 
+/// Holds the animation clock that moves the laser.
 class _LaserSweepState extends State<LaserSweep>
     with SingleTickerProviderStateMixin {
+  // Runs from 0 to 1 and back; 0 = top, 1 = bottom.
   late final AnimationController _c =
       AnimationController(vsync: this, duration: widget.duration);
 
@@ -32,6 +46,7 @@ class _LaserSweepState extends State<LaserSweep>
     if (widget.active) _c.repeat(reverse: true);
   }
 
+  // Start or stop the animation when [active] changes.
   @override
   void didUpdateWidget(covariant LaserSweep oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -42,6 +57,7 @@ class _LaserSweepState extends State<LaserSweep>
     }
   }
 
+  // Free the animation resources when the widget is removed.
   @override
   void dispose() {
     _c.dispose();
@@ -50,11 +66,13 @@ class _LaserSweepState extends State<LaserSweep>
 
   @override
   Widget build(BuildContext context) {
+    // The child sits underneath; the laser is painted on top of it.
     return Stack(
       children: [
         widget.child,
         if (widget.active)
           Positioned.fill(
+            // Touches pass through the laser to the widgets below.
             child: IgnorePointer(
               child: AnimatedBuilder(
                 animation: _c,
@@ -72,17 +90,20 @@ class _LaserSweepState extends State<LaserSweep>
   }
 }
 
+/// Draws the laser line and its glow on the canvas.
 class _LaserPainter extends CustomPainter {
   _LaserPainter(this.t, this.color);
 
+  /// Position of the laser: 0 = top edge, 1 = bottom edge.
   final double t;
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Vertical position of the line in pixels.
     final y = size.height * t;
 
-    // Trailing scan wash.
+    // Trailing scan wash: a 60 px band above the line that fades in.
     final trail = Rect.fromLTRB(0, y - 60, size.width, y);
     canvas.drawRect(
       trail,
@@ -112,6 +133,7 @@ class _LaserPainter extends CustomPainter {
     );
   }
 
+  // Redraw only when the position or colour changed.
   @override
   bool shouldRepaint(covariant _LaserPainter old) =>
       old.t != t || old.color != color;

@@ -1,3 +1,12 @@
+/// Turns the raw YOLO11s output numbers into a list of detections.
+///
+/// In: the model's output tensor (a block of numbers: 8,400 candidate boxes,
+/// each with 4 box values and 13 class scores). Out: a short list of
+/// [YoloDetection] (class, score, box). NMS (non-max suppression) removes
+/// duplicate boxes that cover the same object. Also holds the class list.
+/// Used with the model `assets/models/yolo11s_currency.tflite`.
+library;
+
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -19,14 +28,19 @@ enum YoloClass {
 
   const YoloClass(this.id, this.label, {this.denomination});
 
+  /// Position of this class in the model output (0-12).
   final int id;
+
+  /// Name used by the model, also shown in messages.
   final String label;
 
   /// Set for the seven note classes, null for security-feature classes.
   final int? denomination;
 
+  /// True for the seven denomination classes.
   bool get isNote => denomination != null;
 
+  /// Looks up a class by its model output index.
   static YoloClass byId(int id) => values[id];
 }
 
@@ -34,12 +48,20 @@ enum YoloClass {
 class BoxRect {
   const BoxRect(this.left, this.top, this.right, this.bottom);
 
+  /// Edges in pixels; (left, top) is the top-left corner.
   final double left, top, right, bottom;
 
+  /// Box width in pixels.
   double get width => right - left;
+
+  /// Box height in pixels.
   double get height => bottom - top;
+
+  /// Box area in square pixels (never negative).
   double get area => math.max(0, width) * math.max(0, height);
 
+  /// IoU (intersection over union): how much this box overlaps [o], from
+  /// 0 (no overlap) to 1 (identical boxes).
   double iou(BoxRect o) {
     final w = math.min(right, o.right) - math.max(left, o.left);
     final h = math.min(bottom, o.bottom) - math.max(top, o.top);
@@ -48,6 +70,7 @@ class BoxRect {
     return inter / (area + o.area - inter);
   }
 
+  /// New box with [fx] applied to the x edges and [fy] to the y edges.
   BoxRect map(double Function(double) fx, double Function(double) fy) =>
       BoxRect(fx(left), fy(top), fx(right), fy(bottom));
 
@@ -56,11 +79,17 @@ class BoxRect {
       '${right.toStringAsFixed(0)}, ${bottom.toStringAsFixed(0)}]';
 }
 
+/// One thing YOLO found: its class, confidence and box.
 class YoloDetection {
   const YoloDetection(this.cls, this.score, this.box);
 
+  /// What was found (a note denomination or a security feature).
   final YoloClass cls;
+
+  /// Confidence from 0 to 1 (higher = more sure).
   final double score;
+
+  /// Where it was found.
   final BoxRect box;
 
   @override
@@ -73,10 +102,20 @@ class YoloDetection {
 /// Mirrors Ultralytics `non_max_suppression` defaults used by
 /// `model.predict()` in Colab: conf 0.25, IoU 0.7, class-aware, max 300.
 abstract final class YoloDecoder {
+  /// 7 note denominations + 6 security-feature classes.
   static const int numClasses = 13;
+
+  /// Candidate box positions per image for a 640x640 YOLO input.
   static const int anchors = 8400;
+
+  /// Scores at or below 0.25 are ignored (the Ultralytics default).
   static const double defaultConf = 0.25;
+
+  /// Same-class boxes overlapping more than 0.7 IoU are treated as
+  /// duplicates (the Ultralytics default).
   static const double defaultIou = 0.7;
+
+  /// Keep at most this many detections.
   static const int maxDetections = 300;
 
   /// Highest score each class reached on any anchor, including scores below
@@ -105,9 +144,12 @@ abstract final class YoloDecoder {
     double iou = defaultIou,
   }) {
     assert(output.length == (4 + numClasses) * anchors);
+    // Step 1: if boxes are 0-1 fractions, multiply by 640 to get pixels.
     final scale = normalized ? inputSize.toDouble() : 1.0;
     final candidates = <YoloDetection>[];
 
+    // Step 2: for each of the 8,400 anchors, find its best class score and
+    // keep it only if the score beats the confidence threshold.
     for (var a = 0; a < anchors; a++) {
       var best = -1;
       var bestScore = conf;
@@ -119,6 +161,7 @@ abstract final class YoloDecoder {
         }
       }
       if (best < 0) continue;
+      // Step 3: convert centre/size (cx, cy, w, h) to corner coordinates.
       final cx = output[a] * scale;
       final cy = output[anchors + a] * scale;
       final w = output[2 * anchors + a] * scale;
@@ -130,6 +173,8 @@ abstract final class YoloDecoder {
       ));
     }
 
+    // Step 4: NMS. Go from highest to lowest score and drop any box that
+    // overlaps an already-kept box of the same class by more than 0.7 IoU.
     candidates.sort((x, y) => y.score.compareTo(x.score));
     final kept = <YoloDetection>[];
     for (final d in candidates) {

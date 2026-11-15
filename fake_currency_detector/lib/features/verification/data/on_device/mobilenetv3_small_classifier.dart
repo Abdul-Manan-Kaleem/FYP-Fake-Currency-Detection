@@ -1,3 +1,11 @@
+/// Small image classifier (MobileNetV3-Small) for Rs 10-1,000 notes.
+///
+/// In: a 224x224 RGB tensor (a block of numbers). Out: one number, the
+/// probability the note side is fake. Model file:
+/// `assets/models/mobilenetv3small_final.tflite`. Currently switched off by
+/// `kSmallCnnEnabled`.
+library;
+
 import 'dart:typed_data';
 
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -15,18 +23,25 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 class MobileNetV3SmallClassifier {
   MobileNetV3SmallClassifier._(this._interpreter);
 
+  /// Path of the TFLite model file inside the app assets.
   static const String asset = 'assets/models/mobilenetv3small_final.tflite';
+
+  /// Name shown in results.
   static const String modelName =
       'MobileNetV3-Small · genuine/fake · Rs 10–1,000';
 
   /// Denominations this model was trained on.
   static const Set<int> denominations = {10, 20, 50, 100, 500, 1000};
 
+  /// True when [denomination] (in rupees) is one this model handles.
   static bool supports(int? denomination) =>
       denomination != null && denominations.contains(denomination);
 
+  /// The TFLite runtime object that actually runs the model.
   final Interpreter _interpreter;
 
+  /// Loads the model from assets (2 CPU threads) and checks its input and
+  /// output shapes match what this class expects; throws otherwise.
   static Future<MobileNetV3SmallClassifier> load() async {
     final interpreter = await Interpreter.fromAsset(
       asset,
@@ -43,10 +58,12 @@ class MobileNetV3SmallClassifier {
 
   /// Probability (0..1) that this side shows a fake note.
   double fakeProbability(Float32List rgb224) {
+    // The interpreter works on raw bytes: 4 bytes in = one float32 out.
     final out = Uint8List(4);
     _interpreter.run(rgb224.buffer.asUint8List(), out);
     return ByteData.sublistView(out).getFloat32(0, Endian.little);
   }
 
+  /// Frees the model's memory. Call when finished.
   void close() => _interpreter.close();
 }

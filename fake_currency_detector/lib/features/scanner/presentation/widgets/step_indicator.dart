@@ -4,14 +4,20 @@ import '../../../../core/theme/app_colors.dart';
 import '../../domain/capture_models.dart';
 
 /// FRONT ─ BACK ─ ANALYZE progress rail.
+///
+/// Shown at the top of the capture screen. Each step is a dot: green with
+/// a tick when done, cyan when current, grey when still to come.
 class StepIndicator extends StatelessWidget {
   const StepIndicator({super.key, required this.state});
 
+  /// Current capture state (which step, and which photos exist).
   final CaptureState state;
 
   @override
   Widget build(BuildContext context) {
     final step = state.step;
+    // Each item is (label, done, active). The flip step counts as BACK.
+    // ANALYZE is never "done" here; this screen is left when it starts.
     final items = [
       ('FRONT', state.front != null, step == CaptureStep.front),
       (
@@ -25,6 +31,8 @@ class StepIndicator extends StatelessWidget {
     return Row(
       children: [
         for (final (i, (label, done, active)) in items.indexed) ...[
+          // Connector line before each dot except the first; green once
+          // the previous step is done.
           if (i > 0)
             Expanded(
               child: AnimatedContainer(
@@ -46,15 +54,21 @@ class StepIndicator extends StatelessWidget {
   }
 }
 
+/// One step marker: a round dot (with a tick when done) and its label.
 class _Dot extends StatelessWidget {
   const _Dot({required this.label, required this.done, required this.active});
 
   final String label;
+
+  /// Step finished: green with a tick.
   final bool done;
+
+  /// Step in progress: cyan.
   final bool active;
 
   @override
   Widget build(BuildContext context) {
+    // Colour: green if done, cyan if active, otherwise muted grey.
     final color = done
         ? AppColors.emerald
         : active

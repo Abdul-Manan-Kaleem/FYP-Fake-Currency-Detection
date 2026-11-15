@@ -1,10 +1,23 @@
+/// Verdict styles: colours, icons and labels for verdicts and check statuses.
+///
+/// These are extensions, so code can write verdict.color or status.icon.
+/// Used by verdict_badge.dart, inspection_tile.dart and results_screen.dart.
+/// Input: none (they extend the enums VerificationVerdict, CheckStatus and
+/// FeatureCheckId).
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/models/feature_check_model.dart';
 import '../../data/models/verification_result_model.dart';
 
+/// Colour, gauge colours and icon for each [VerificationVerdict].
+///
+/// Green means real, amber means suspicious or unverifiable, red means
+/// fake or not a banknote.
 extension VerdictStyle on VerificationVerdict {
+  /// Main colour of the verdict.
   Color get color => switch (this) {
         VerificationVerdict.real => AppColors.emerald,
         VerificationVerdict.suspicious => AppColors.amber,
@@ -23,6 +36,7 @@ extension VerdictStyle on VerificationVerdict {
         _ => const [AppColors.amber, AppColors.amber],
       };
 
+  /// Icon of the verdict.
   IconData get icon => switch (this) {
         VerificationVerdict.real => Icons.verified_rounded,
         VerificationVerdict.suspicious => Icons.report_problem_rounded,
@@ -33,7 +47,10 @@ extension VerdictStyle on VerificationVerdict {
       };
 }
 
+/// Colour, icon and short label for each [CheckStatus] of a feature check.
 extension CheckStatusStyle on CheckStatus {
+  /// Colour of the status (green pass, red fail, amber unclear/warning,
+  /// grey skipped or not applicable).
   Color get color => switch (this) {
         CheckStatus.pass => AppColors.emerald,
         CheckStatus.fail => AppColors.crimson,
@@ -43,6 +60,7 @@ extension CheckStatusStyle on CheckStatus {
         CheckStatus.warning => AppColors.amber,
       };
 
+  /// Icon of the status.
   IconData get icon => switch (this) {
         CheckStatus.pass => Icons.check_rounded,
         CheckStatus.fail => Icons.close_rounded,
@@ -52,6 +70,7 @@ extension CheckStatusStyle on CheckStatus {
         CheckStatus.warning => Icons.warning_amber_rounded,
       };
 
+  /// Short upper-case word shown on the tile.
   String get label => switch (this) {
         CheckStatus.pass => 'PASS',
         CheckStatus.fail => 'FAIL',
@@ -62,6 +81,7 @@ extension CheckStatusStyle on CheckStatus {
       };
 }
 
+/// Icon for each security feature check (serial number, seal, thread, etc.).
 extension FeatureCheckIcon on FeatureCheckId {
   IconData get icon => switch (this) {
         FeatureCheckId.denomination => Icons.payments_outlined,

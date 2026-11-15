@@ -1,3 +1,11 @@
+/// Note identity banner: says a Pakistani banknote was found and its value.
+///
+/// Full size it is a glowing card on the results screen
+/// (results_screen.dart). Compact it is a one-line pill on the capture
+/// screen (capture_screen.dart).
+/// Input: the denomination read on the front and/or back (may be null).
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -19,12 +27,19 @@ class NoteIdentityBanner extends StatelessWidget {
     this.compact = false,
   });
 
+  /// Denomination read on the front, or null.
   final int? frontValue;
+
+  /// Denomination read on the back, or null.
   final int? backValue;
+
+  /// True for the one-line pill, false for the full card.
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    // Pick the value text and the detail line from what was read:
+    // both sides equal, both different, only one side, or neither.
     final agreed = frontValue != null && frontValue == backValue;
     final String value;
     final String detail;
@@ -42,10 +57,12 @@ class NoteIdentityBanner extends StatelessWidget {
       value = 'Value not confirmed';
       detail = 'A Pakistani banknote was found, but its value could not be read';
     }
+    // Green when the value is confirmed, amber when unsure or mismatched.
     final color = agreed || (compact && (frontValue ?? backValue) != null)
         ? AppColors.emerald
         : AppColors.amber;
 
+    // Compact version: a one-line pill.
     if (compact) {
       return Center(
         child: Container(
@@ -75,6 +92,7 @@ class NoteIdentityBanner extends StatelessWidget {
       );
     }
 
+    // Full version: glass card with icon, heading, value and detail.
     return GlassContainer(
       glowColor: color,
       glowIntensity: 0.2,

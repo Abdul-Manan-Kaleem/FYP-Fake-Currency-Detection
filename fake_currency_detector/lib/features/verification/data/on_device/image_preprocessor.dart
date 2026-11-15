@@ -1,3 +1,13 @@
+/// Turns a captured photo into the inputs every model needs.
+///
+/// In: a photo file path (or raw bytes). Out: a [PreparedImage] holding the
+/// downsized pixels, the YOLO tensor (a tensor is just a block of numbers fed
+/// to a model), the CNN tensor and simple quality scores (blur, glare).
+/// Also holds helpers for edge strips, OCR crops, mark counting and a copy
+/// of Pillow's resize so the Rs 5,000 model sees what it saw in training.
+/// Uses no model itself.
+library;
+
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
@@ -10,14 +20,23 @@ import 'native_decoder.dart';
 import 'yolo_decoder.dart';
 
 /// Ultralytics-style letterbox geometry, used to map boxes back.
+/// "Letterbox" = shrink the photo to fit a 640x640 square and fill the
+/// leftover space with grey bars, so the note is not stretched.
 class Letterbox {
   const Letterbox({required this.scale, required this.padX, required this.padY});
 
+  /// Shrink factor applied to the working image (640 / longer side).
   final double scale;
+
+  /// Grey bar width on the left, in pixels of the 640x640 input.
   final double padX;
+
+  /// Grey bar height on the top, in pixels of the 640x640 input.
   final double padY;
 
   /// Letterboxed-input box → working-image box.
+  /// Undoes the steps of letterboxing: remove the grey bar, then divide by
+  /// the shrink factor.
   BoxRect toImage(BoxRect b) =>
       b.map((x) => (x - padX) / scale, (y) => (y - padY) / scale);
 }
@@ -40,17 +59,24 @@ class PreparedImage {
   /// memory. All boxes refer to it; OCR crops and mark counting use it
   /// directly, with no JPEG written or decoded again.
   final RgbaImage pixels;
+
+  /// Working image width in pixels.
   final int width;
+
+  /// Working image height in pixels.
   final int height;
 
   /// float32 [1, 3, 640, 640] planar RGB in 0–1 (the TFLite input is BCHW).
   final Float32List yoloInput;
+
+  /// Padding info needed to map YOLO boxes back onto [pixels].
   final Letterbox letterbox;
 
   /// float32 [1, 224, 224, 3] RGB in 0–255 for the Rs 5,000
   /// synthetic-alteration CNN (plain resize, as before).
   final Float32List cnnInput;
 
+  /// Blur, glare and brightness scores for the photo.
   final ImageQualityModel quality;
 
   /// Long edge / short edge of the capture. A-series paper is 1.41.
@@ -76,15 +102,25 @@ class Rs5000Inputs {
   final List<String> edgeStripPaths;
 }
 
+/// Static helpers that prepare photos for the models. Never instantiated.
 abstract final class ImagePreprocessor {
+  /// Side of the square YOLO input, in pixels.
   static const int yoloSize = 640;
+
+  /// Side of the square CNN (MobileNet) input, in pixels.
   static const int cnnSize = 224;
+
+  /// Photos are shrunk so the longer side is at most this many pixels.
   static const int workingLongSide = 2048;
 
-  /// Ultralytics letterbox pad colour.
+  /// Ultralytics letterbox pad colour (mid grey, out of 255).
   static const int padValue = 114;
 
+  /// Laplacian variance at or above this counts as fully sharp
+  /// (blurScore = 0). Lower variance gives a higher blur score.
   static const double sharpVariance = 120;
+
+  /// If this share of pixels is almost white (>= 250), glareScore is 1.0.
   static const double fullGlareFraction = 0.25;
 
   /// Decodes [path] once with the native codec, already scaled to the
@@ -111,6 +147,8 @@ abstract final class ImagePreprocessor {
     return fromPixels(RgbaImage.fromImage(image));
   }
 
+  /// Builds the [PreparedImage] from already-decoded pixels: YOLO tensor,
+  /// CNN tensor, quality scores, aspect ratio and paper-white share.
   static PreparedImage fromPixels(RgbaImage pixels) {
     final image = pixels.toImage();
     final (yolo, letterbox) = _letterbox(image);
@@ -131,17 +169,22 @@ abstract final class ImagePreprocessor {
   /// Resize keeping aspect ratio, centre on a 114-grey square, scale to 0–1,
   /// and lay out channels-first.
   static (Float32List, Letterbox) _letterbox(img.Image image) {
+    // Step 1: pick the scale that makes the longer side exactly 640.
     final scale = math.min(yoloSize / image.width, yoloSize / image.height);
     final nw = (image.width * scale).round();
     final nh = (image.height * scale).round();
     final resized = img.copyResize(image,
         width: nw, height: nh, interpolation: img.Interpolation.linear);
+    // Step 2: split the leftover space evenly to centre the image.
     final padX = ((yoloSize - nw) / 2).floorToDouble();
     final padY = ((yoloSize - nh) / 2).floorToDouble();
 
+    // Step 3: start with an all-grey (114/255) 3-plane buffer. Planes are
+    // red, green, blue one after another (channels-first).
     const plane = yoloSize * yoloSize;
     final out = Float32List(3 * plane)..fillRange(0, 3 * plane, padValue / 255);
     final ox = padX.toInt(), oy = padY.toInt();
+    // Step 4: copy the resized pixels into the middle, scaled to 0-1.
     for (var y = 0; y < nh; y++) {
       final row = (y + oy) * yoloSize + ox;
       for (var x = 0; x < nw; x++) {
@@ -158,8 +201,10 @@ abstract final class ImagePreprocessor {
   /// Rs 5,000-only inputs, decoded again from the original full-resolution
   /// capture (microprint is tiny, so nothing may be downscaled first).
   static Future<Rs5000Inputs> prepareRs5000(String path, String outDir) async {
-    // Native full-resolution decode; resize and strip cutting off the UI
-    // isolate.
+    // Step 1: native full-resolution decode; resize and strip cutting off
+    // the UI isolate. (An isolate is a separate worker thread in Dart.)
+    // Step 2 (inside Isolate.run): make the 224x224 model input and the
+    // four edge strips for microprint OCR.
     final full = await NativeDecoder.decode(path);
     final tag = '${path.hashCode.toUnsigned(32)}';
     return Isolate.run(() => Rs5000Inputs(
@@ -175,6 +220,8 @@ abstract final class ImagePreprocessor {
 
   /// Close-up photo of the microprint: measures sharpness inside the guide
   /// band (middle of the frame) and writes that band for OCR.
+  /// In: photo [path] and output folder [outDir]. Out: the sharpness
+  /// (Laplacian variance, higher = sharper) and the saved band image path.
   static Future<({double sharpness, String bandPath})> analyzeCloseUp(
     String path,
     String outDir,
@@ -192,6 +239,7 @@ abstract final class ImagePreprocessor {
         height: (image.height * 0.34).round(),
       );
       File(band).writeAsBytesSync(img.encodeBmp(crop));
+      // Fixed 1,000 px width so scores are comparable between photos.
       return laplacianVariance(img.copyResize(crop, width: 1000));
     });
     return (sharpness: sharpness, bandPath: band);
@@ -199,6 +247,7 @@ abstract final class ImagePreprocessor {
 
   /// Variance of the 4-neighbour Laplacian on grayscale: low = blurry.
   static double laplacianVariance(img.Image image) {
+    // Step 1: convert to grey and copy brightness values into a flat list.
     final g = img.grayscale(img.Image.from(image));
     final w = g.width, h = g.height;
     final lum = Float64List(w * h);
@@ -207,6 +256,8 @@ abstract final class ImagePreprocessor {
         lum[y * w + x] = g.getPixel(x, y).r.toDouble();
       }
     }
+    // Step 2: for each inner pixel, Laplacian = sum of 4 neighbours minus
+    // 4x the pixel. Sharp edges give big values; blur gives small ones.
     var sum = 0.0, sq = 0.0;
     var n = 0;
     for (var y = 1; y < h - 1; y++) {
@@ -219,6 +270,7 @@ abstract final class ImagePreprocessor {
       }
     }
     if (n == 0) return 0;
+    // Step 3: variance = mean of squares - square of mean.
     final mean = sum / n;
     return sq / n - mean * mean;
   }
@@ -233,15 +285,19 @@ abstract final class ImagePreprocessor {
   /// side bands so their text runs horizontally, enlarges them, and writes
   /// JPEGs for OCR.
   static List<String> writeEdgeStrips(img.Image image, String outDir, String tag) {
+    // Step 1: strip thickness = 10% of the short side; skip tiny images.
     final band = (math.min(image.width, image.height) * edgeBand).round();
     if (band < 8) return const [];
     final w = image.width, h = image.height;
+    // Step 2: cut top, bottom, left, right. Left/right are rotated 90 deg
+    // so their text reads left to right.
     final strips = <img.Image>[
       img.copyCrop(image, x: 0, y: 0, width: w, height: band),
       img.copyCrop(image, x: 0, y: h - band, width: w, height: band),
       img.copyRotate(img.copyCrop(image, x: 0, y: 0, width: band, height: h), angle: 90),
       img.copyRotate(img.copyCrop(image, x: w - band, y: 0, width: band, height: h), angle: -90),
     ];
+    // Step 3: enlarge small strips (OCR needs big text) and save each.
     final paths = <String>[];
     for (final (i, strip) in strips.indexed) {
       var s = strip;
@@ -260,7 +316,9 @@ abstract final class ImagePreprocessor {
   /// Blank-paper pixels: bright (all channels ≥ 200) and colourless
   /// (channel spread ≤ 28). Banknotes are printed edge to edge and rarely
   /// exceed a few percent; a sheet of paper is mostly this.
+  /// Returns a share from 0.0 to 1.0.
   static double paperWhiteFraction(img.Image image) {
+    // Shrink to 256 px wide first: fast and enough for a rough share.
     final small = img.copyResize(image, width: 256);
     var white = 0;
     for (final p in small) {
@@ -301,8 +359,13 @@ abstract final class ImagePreprocessor {
     return out;
   }
 
+  /// Fixed-point precision used by Pillow (22 bits), so integer maths
+  /// matches Pillow exactly.
   static const int _precisionBits = 32 - 8 - 2;
 
+  /// Works out, for each output pixel, which input pixels it blends
+  /// (start index, count) and the integer weight of each (a triangle
+  /// filter that widens when shrinking, which gives the antialiasing).
   static (List<int>, List<int>, List<List<int>>) _coeffs(int inSize, int outSize) {
     final scale = inSize / outSize;
     final filterScale = scale < 1.0 ? 1.0 : scale;
@@ -339,12 +402,15 @@ abstract final class ImagePreprocessor {
     return (bounds0, bounds1, kernels);
   }
 
+  /// Converts a fixed-point sum back to a 0-255 byte, clamping overflow.
   static int _clip8(int v) {
     if (v >= (1 << (_precisionBits + 8))) return 255;
     if (v <= 0) return 0;
     return v >> _precisionBits;
   }
 
+  /// One resize pass (horizontal or vertical) using the weights from
+  /// [_coeffs]. Output is packed RGB bytes (alpha dropped).
   static Uint8List _resamplePass(
     Uint8List src,
     int w,
@@ -381,6 +447,7 @@ abstract final class ImagePreprocessor {
     return out;
   }
 
+  /// Plain resize to 224x224, laid out height-width-RGB, values 0-255.
   static Float32List _cnnTensor(img.Image image) {
     final resized = img.copyResize(image,
         width: cnnSize, height: cnnSize, interpolation: img.Interpolation.linear);
@@ -397,7 +464,10 @@ abstract final class ImagePreprocessor {
     return out;
   }
 
+  /// Scores blur, glare and brightness (all on a 480 px wide grey copy).
   static ImageQualityModel _quality(img.Image image) {
+    // Step 1: shrink to grey and record brightness; count near-white
+    // pixels (>= 250 of 255) as "blown out" glare.
     final small = img.grayscale(img.copyResize(image, width: 480));
     final w = small.width, h = small.height;
     final lum = Float64List(w * h);
@@ -411,6 +481,7 @@ abstract final class ImagePreprocessor {
         if (v >= 250) blown++;
       }
     }
+    // Step 2: Laplacian variance, same idea as [laplacianVariance].
     var lapSum = 0.0, lapSq = 0.0;
     var n = 0;
     for (var y = 1; y < h - 1; y++) {
@@ -425,6 +496,8 @@ abstract final class ImagePreprocessor {
     final mean = n == 0 ? 0.0 : lapSum / n;
     final variance = n == 0 ? 0.0 : lapSq / n - mean * mean;
     final total = w * h;
+    // Step 3: scores are clamped to 0-1. Blur: 0 = sharp, 1 = very blurry.
+    // Glare: 1 when 25% or more of pixels are blown out.
     return ImageQualityModel(
       blurScore: (1 - variance / sharpVariance).clamp(0.0, 1.0),
       glareScore: (blown / total / fullGlareFraction).clamp(0.0, 1.0),
@@ -439,7 +512,10 @@ abstract final class ImagePreprocessor {
   static Future<int?> countMarks(RgbaImage pixels, BoxRect box) =>
       Isolate.run(() => countMarksIn(pixels.toImage(), box));
 
+  /// Does the work of [countMarks] on a decoded image. [box] is in
+  /// working-image pixels. Returns the mark count, or null if none.
   static int? countMarksIn(img.Image image, BoxRect box) {
+    // Step 1: crop the box with a small 4% margin, kept inside the image.
     final mx = box.width * 0.04, my = box.height * 0.04;
     final x = (box.left - mx).clamp(0, image.width - 1).toInt();
     final y = (box.top - my).clamp(0, image.height - 1).toInt();
@@ -447,6 +523,7 @@ abstract final class ImagePreprocessor {
     final b = (box.bottom + my).clamp(y + 1, image.height).toInt();
     var crop = img.grayscale(
         img.copyCrop(image, x: x, y: y, width: r - x, height: b - y));
+    // Step 2: enlarge very small crops so the short side is at least 48 px.
     if (math.min(crop.width, crop.height) < 48) {
       final s = 48 / math.min(crop.width, crop.height);
       crop = img.copyResize(crop,
@@ -463,7 +540,8 @@ abstract final class ImagePreprocessor {
       }
     }
 
-    // Otsu threshold: marks are the darker class.
+    // Step 3: Otsu threshold. It picks the grey level that best separates
+    // the picture into dark and light groups. Marks are the darker group.
     var sumAll = 0.0;
     for (var t = 0; t < 256; t++) {
       sumAll += t * hist[t];
@@ -483,7 +561,8 @@ abstract final class ImagePreprocessor {
       }
     }
 
-    // 8-connected components of dark pixels.
+    // Step 4: group touching dark pixels (8 neighbours, flood fill) into
+    // blobs and count them.
     final seen = Uint8List(total);
     final stack = <int>[];
     var marks = 0;
@@ -508,7 +587,8 @@ abstract final class ImagePreprocessor {
           }
         }
       }
-      // Ignore specks and anything that is basically the background.
+      // Ignore specks (under 1.5% of the crop) and anything that is
+      // basically the background (over 50%).
       if (area >= total * 0.015 && area <= total * 0.5) marks++;
     }
     return marks == 0 ? null : marks;
@@ -529,20 +609,23 @@ abstract final class ImagePreprocessor {
         final out = <(String, String)>[];
         final stamp = DateTime.now().microsecondsSinceEpoch;
         for (final (i, b) in boxes.indexed) {
-          // Generous margins: a clipped first/last character is a false
-          // mismatch.
+          // Step 1: crop with generous margins (15% sideways, 30% up and
+          // down): a clipped first/last character is a false mismatch.
           final mx = b.width * 0.15, my = b.height * 0.30;
           final x = (b.left - mx).clamp(0, image.width - 1).toInt();
           final y = (b.top - my).clamp(0, image.height - 1).toInt();
           final r = (b.right + mx).clamp(x + 1, image.width).toInt();
           final btm = (b.bottom + my).clamp(y + 1, image.height).toInt();
           var crop = img.copyCrop(image, x: x, y: y, width: r - x, height: btm - y);
+          // Step 2: rotate tall crops upright; make sure height >= 64 px.
           if (crop.height > crop.width * 1.3) crop = img.copyRotate(crop, angle: -90);
           if (crop.height < 64) {
             crop = img.copyResize(crop,
                 height: 64, interpolation: img.Interpolation.cubic);
           }
 
+          // Step 3: enhanced copy = grey, contrast stretched to full 0-255,
+          // height >= 128 px.
           var enhanced = img.normalize(img.grayscale(img.Image.from(crop)),
               min: 0, max: 255);
           if (enhanced.height < 128) {
@@ -550,6 +633,7 @@ abstract final class ImagePreprocessor {
                 height: 128, interpolation: img.Interpolation.cubic);
           }
 
+          // Step 4: save both as BMP files and return their paths.
           final plain = '$outDir/crop_${stamp}_${i}_a.bmp';
           final enh = '$outDir/crop_${stamp}_${i}_b.bmp';
           File(plain).writeAsBytesSync(img.encodeBmp(crop));

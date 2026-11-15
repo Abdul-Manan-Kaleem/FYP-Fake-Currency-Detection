@@ -1,3 +1,8 @@
+/// Reusable "frosted glass" card used to hold content across the app.
+///
+/// It blurs whatever is behind it and adds a thin border and optional glow.
+library;
+
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -18,18 +23,34 @@ class GlassContainer extends StatelessWidget {
     this.fill,
   });
 
+  /// Content shown inside the card.
   final Widget child;
+
+  /// Space between the card edge and the content.
   final EdgeInsetsGeometry padding;
+
+  /// How rounded the corners are.
   final double borderRadius;
+
+  /// Colour of the outer glow; no glow when null.
   final Color? glowColor;
+
+  /// Strength of the glow, from 0 (none) to 1 (full).
   final double glowIntensity;
+
+  /// Border colour; uses the default glass border when null.
   final Color? borderColor;
+
+  /// How strongly the background behind the card is blurred.
   final double blur;
+
+  /// Solid fill colour; uses a faint white gradient when null.
   final Color? fill;
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(borderRadius);
+    // Outer layer draws the optional glow (a coloured shadow).
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
@@ -42,6 +63,7 @@ class GlassContainer extends StatelessWidget {
             ),
         ],
       ),
+      // Clip to rounded corners, then blur what is behind the card.
       child: ClipRRect(
         borderRadius: radius,
         child: BackdropFilter(
@@ -53,6 +75,8 @@ class GlassContainer extends StatelessWidget {
               border: Border.all(
                 color: borderColor ?? AppColors.glassBorder,
               ),
+              // Default fill fades from 7% to 2% white; a custom fill
+              // fades to 85% of its own opacity.
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,

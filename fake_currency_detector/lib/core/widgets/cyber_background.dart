@@ -1,3 +1,8 @@
+/// Reusable page background: dark gradient, faint grid and coloured glows.
+///
+/// Screens put their content inside it so all pages share the same look.
+library;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -10,14 +15,20 @@ class CyberBackground extends StatelessWidget {
     this.accent = AppColors.cyan,
   });
 
+  /// The page content drawn on top of the background.
   final Widget child;
+
+  /// Colour of the glow in the top-left corner (changes with an animation).
   final Color accent;
 
   @override
   Widget build(BuildContext context) {
+    // Layers from back to front: gradient, grid, accent glow, violet glow,
+    // then the page content.
     return Stack(
       fit: StackFit.expand,
       children: [
+        // Layer 1: dark gradient from top to bottom.
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -27,7 +38,9 @@ class CyberBackground extends StatelessWidget {
             ),
           ),
         ),
+        // Layer 2: faint grid lines.
         const CustomPaint(painter: _GridPainter()),
+        // Layer 3: accent glow top-left; fades smoothly when [accent] changes.
         AnimatedContainer(
           duration: const Duration(milliseconds: 800),
           decoration: BoxDecoration(
@@ -38,6 +51,7 @@ class CyberBackground extends StatelessWidget {
             ),
           ),
         ),
+        // Layer 4: fixed violet glow at the bottom-right.
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: RadialGradient(
@@ -56,11 +70,14 @@ class CyberBackground extends StatelessWidget {
   }
 }
 
+/// Draws the faint grid by hand on the canvas.
 class _GridPainter extends CustomPainter {
   const _GridPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Thin white lines at about 2.5% opacity, so the grid is barely visible.
+    // Lines are drawn every 28 pixels, first vertical, then horizontal.
     final paint = Paint()
       ..color = Colors.white.withValues(alpha: 0.025)
       ..strokeWidth = 1;
@@ -73,6 +90,7 @@ class _GridPainter extends CustomPainter {
     }
   }
 
+  // The grid never changes, so it never needs to be redrawn.
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

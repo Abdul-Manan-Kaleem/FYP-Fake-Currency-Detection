@@ -1,12 +1,31 @@
+/// Data classes for the photo-capture flow.
+///
+/// They describe which side was photographed, how, and the current state of
+/// the capture screen. The controller updates [CaptureState]; screens read it.
+library;
+
+/// The two sides of a banknote.
 enum NoteSide {
   front,
   back;
 
+  /// Upper-case name, such as "FRONT", for showing on screen.
   String get label => name.toUpperCase();
 }
 
-enum CaptureSource { documentScanner, camera, gallery }
+/// How a photo was obtained.
+enum CaptureSource {
+  /// ML Kit document scanner.
+  documentScanner,
 
+  /// Plain phone camera.
+  camera,
+
+  /// Picked from the gallery.
+  gallery,
+}
+
+/// One saved photo of a note side, with details about it.
 class CapturedImage {
   const CapturedImage({
     required this.path,
@@ -16,9 +35,16 @@ class CapturedImage {
     this.denomination,
   });
 
+  /// File path of the image.
   final String path;
+
+  /// Which side of the note this photo shows.
   final NoteSide side;
+
+  /// How the photo was taken.
   final CaptureSource source;
+
+  /// When the photo was taken.
   final DateTime capturedAt;
 
   /// Denomination recognised right after capture (YOLO on the front,
@@ -27,8 +53,12 @@ class CapturedImage {
 }
 
 /// Steps of the guided two-sided capture flow.
+/// Order: scan the front, ask the user to flip the note, scan the back,
+/// then review both photos.
 enum CaptureStep { front, flip, back, review }
 
+/// Everything the capture screen needs to know right now.
+/// It is immutable: changes make a new copy through [copyWith].
 class CaptureState {
   const CaptureState({
     this.front,
@@ -41,10 +71,19 @@ class CaptureState {
     this.sideError,
   });
 
+  /// Accepted photo of the front, or null if not taken yet.
   final CapturedImage? front;
+
+  /// Accepted photo of the back, or null if not taken yet.
   final CapturedImage? back;
+
+  /// Which step of the flow the user is on.
   final CaptureStep step;
+
+  /// True while a scan or side check is running.
   final bool busy;
+
+  /// Error text to show, if something failed.
   final String? error;
 
   /// Shown on the scanner HUD while busy (e.g. "checking side").
@@ -57,11 +96,17 @@ class CaptureState {
   /// can be offered instead.
   final NoteSide? basicCameraSide;
 
+  /// True when both sides have been captured.
   bool get isComplete => front != null && back != null;
 
+  /// Returns the photo for the given [side], or null if missing.
   CapturedImage? imageFor(NoteSide side) =>
       side == NoteSide.front ? front : back;
 
+  /// Returns a copy with the given fields changed; the rest stay the same.
+  /// A null argument keeps the old value, so use [clearError] or
+  /// [clearBusyMessage] to really empty those fields. [clearError] also
+  /// clears [basicCameraSide] and [sideError].
   CaptureState copyWith({
     CapturedImage? front,
     CapturedImage? back,
@@ -97,7 +142,10 @@ class SideError {
     this.notBanknote = false,
   });
 
+  /// Message in Roman Urdu (Urdu written in English letters).
   final String urdu;
+
+  /// The same message in English.
   final String english;
 
   /// Heading of the pop-up.
@@ -119,6 +167,7 @@ class SideError {
         'and scan it again.',
   );
 
+  /// The user scanned the back when the front was expected.
   static const backOnFront = SideError(
     urdu: 'Ye note ki back side hai! Barah-e-meherbani pehle front side '
         '(Quaid wali side) scan karen.',
@@ -126,6 +175,7 @@ class SideError {
         '(Quaid-e-Azam portrait side) first.',
   );
 
+  /// The user scanned the front when the back was expected.
   static const frontOnBack = SideError(
     urdu: 'Ye front side hai, ab back side (Building wali side) scan karen.',
     english: 'This is the FRONT. Now scan the BACK (building side).',
@@ -139,6 +189,7 @@ class SideError {
             'scanned is Rs $scanning. Scan the back of the same note.',
       );
 
+  /// The front was already scanned and the user scanned the front again.
   static const sameSideTwice = SideError(
     urdu: 'Aap ne ye side pehle hi scan kar li hai. Ab back side '
         '(Building wali side) scan karen.',

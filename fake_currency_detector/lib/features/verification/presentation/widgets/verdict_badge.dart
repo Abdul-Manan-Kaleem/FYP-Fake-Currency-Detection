@@ -1,24 +1,38 @@
+/// Verdict badge: a pill showing the final verdict (icon and label).
+///
+/// It appears after a 0.9 second delay with a bounce, then its glow pulses.
+/// Used in results_screen.dart under the confidence gauge.
+/// Input: the VerificationVerdict (colour and icon come from
+/// verdict_style.dart, the text from the verdict's label).
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../data/models/verification_result_model.dart';
 import 'verdict_style.dart';
 
 /// Pill badge with a breathing glow that pops in on first build.
+///
+/// [verdict] is the result to display.
 class VerdictBadge extends StatefulWidget {
   const VerdictBadge({super.key, required this.verdict});
 
+  /// The verdict whose colour, icon and label are shown.
   final VerificationVerdict verdict;
 
   @override
   State<VerdictBadge> createState() => _VerdictBadgeState();
 }
 
+/// Owns the two animations: a one-time pop-in and a repeating glow pulse.
 class _VerdictBadgeState extends State<VerdictBadge>
     with TickerProviderStateMixin {
+  // Pop-in animation (scale and fade), plays once.
   late final AnimationController _intro = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 700),
   );
+  // Glow pulse, goes back and forth forever once started.
   late final AnimationController _pulse = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1500),
@@ -27,6 +41,7 @@ class _VerdictBadgeState extends State<VerdictBadge>
   @override
   void initState() {
     super.initState();
+    // After 0.9 s, start the pop-in and the pulse (skipped if disposed).
     Future<void>.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       _intro.forward();
@@ -44,6 +59,8 @@ class _VerdictBadgeState extends State<VerdictBadge>
   @override
   Widget build(BuildContext context) {
     final color = widget.verdict.color;
+    // Outer: bounce in and fade in. Inner: rebuilt each pulse tick so the
+    // glow strength changes.
     return ScaleTransition(
       scale: CurvedAnimation(parent: _intro, curve: Curves.elasticOut),
       child: FadeTransition(
@@ -65,6 +82,7 @@ class _VerdictBadgeState extends State<VerdictBadge>
             ),
             child: child,
           ),
+          // Icon and label (passed as child so it is not rebuilt every tick).
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

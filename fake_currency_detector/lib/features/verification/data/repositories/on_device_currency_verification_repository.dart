@@ -23,12 +23,47 @@ import '../on_device/rs5000_anomaly_classifier.dart';
 import '../on_device/yolo_decoder.dart';
 import '../on_device/yolo_detector.dart';
 
-/// On-device pipeline. Each model keeps its own role:
+/// ON-DEVICE VERIFICATION PIPELINE (the "collector of evidence")
+///
+/// PURPOSE
+/// This is the real scanner of the app. It runs entirely on the phone.
+/// It takes the photos of the front and back of a banknote and produces a
+/// [NoteAnalysisModel]: a bundle of raw EVIDENCE (boxes, OCR text, scores).
+/// It does NOT decide real or fake. That is the job of the VerificationEngine
+/// (domain/verification_engine.dart), which reads this evidence and applies
+/// the rules and the weighted score.
+///
+/// Each model keeps its own role:
 /// - YOLO11s: is it a note, which denomination, and where/how many security
 ///   features (seals, thread, lines, dots, serial regions, printed year)
 /// - ML Kit OCR: reads the text inside the YOLO serial-number / year boxes
-/// - Rs 5,000 CNN: synthetic-alteration score, Rs 5,000 only, supporting
-/// The rule engine (not this class) turns these outputs into a verdict.
+/// - Rs 5,000 CNNs: alteration score and genuine/counterfeit score, Rs 5,000
+///   only, supporting evidence
+/// - Monument classifier: checks the picture on the back
+///
+/// HOW IT FITS
+///   capture screen -> checkSide() / scanSide() right after each photo
+///   -> analyzeBanknote() when both sides exist -> NoteAnalysisModel
+///   -> VerificationEngine.evaluate() -> result screen.
+/// Another class, ApiCurrencyVerificationRepository, is a server-based
+/// alternative with the same interface. This on-device one is the one used.
+///
+/// MAIN SECTIONS OF THIS FILE
+///  1. [SideScan]: result of preparing and running YOLO11s on ONE photo.
+///  2. [OnDeviceCurrencyVerificationRepository]:
+///     a. scanSide / _scan: prepare image + YOLO11s + monument (cached).
+///     b. checkSide: quick "which side is this?" check at capture time.
+///     c. analyzeBanknote: the full pipeline, in these steps:
+///        1.  Find the note box on each side.
+///        1b. Shape gate (half or partial note).
+///        1c. Presence gate (is there really a note?).
+///        2.  OCR of two serial numbers and the printed year.
+///        2a. Count the marks inside the lines/dots boxes.
+///        2b. Rs 5,000 only: full-resolution prep and edge microprint.
+///        3.  Rs 5,000 CNNs (or the small CNN, currently switched off).
+///        4.  Build the [NoteAnalysisModel], including the monument result.
+///  3. Static helpers: box conversion, counting, OCR, sorting by confidence.
+
 /// Image preparation + YOLO11s for one captured side. Computed once per
 /// photo (right after capture) and reused by the side check and analysis.
 class SideScan {
@@ -44,31 +79,68 @@ class SideScan {
     this.monumentKnown = const [],
   });
 
+  /// The resized working copy of the photo (pixels, YOLO input, CNN input,
+  /// quality report, letterbox info).
   final PreparedImage prepared;
 
   /// Post-NMS boxes in working-image pixels.
   final List<YoloDetection> detections;
+
+  /// Highest score each YOLO class reached anywhere in the image, even if it
+  /// never made a box. Used to spot "faintly seen" features.
   final List<double> classMax;
+
+  /// Time spent preparing the image, in milliseconds (for timing logs).
   final int prepareMs;
+
+  /// Time spent running YOLO11s, in milliseconds (for timing logs).
   final int yoloMs;
 
   /// Back-side monument prediction (null when the model is not installed).
   final MonumentPrediction? monument;
+
+  /// True if the monument model file is installed and loaded.
   final bool monumentModelAvailable;
+
+  /// True if the monument model is a finished ("verified") model. A
+  /// preliminary model is only reported and never trusted for decisions.
   final bool monumentVerified;
+
+  /// Denominations the monument model was trained on.
   final List<int> monumentKnown;
 }
 
+/// The on-device scanner. Implements two roles:
+///  * [CurrencyVerificationRepository]: [analyzeBanknote] gives evidence for
+///    the whole note.
+///  * [SideClassifier]: [checkSide] tells which side a photo shows.
+/// Models are loaded lazily on first use and kept for later scans.
 class OnDeviceCurrencyVerificationRepository
     implements CurrencyVerificationRepository, SideClassifier {
+  /// [clock] can be replaced in tests. It is used to reject printed years
+  /// that are in the future.
   OnDeviceCurrencyVerificationRepository({DateTime Function()? clock})
       : _clock = clock ?? DateTime.now;
 
   final DateTime Function() _clock;
+
+  // Lazy model holders: null until first use, then the loaded model future.
+  // ??= means "load only if not loaded yet".
+
+  /// YOLO11s detector (note, denomination, security features).
   Future<YoloDetector>? _yolo;
+
+  /// Rs 5,000 alteration CNN.
   Future<Rs5000AnomalyClassifier>? _cnn;
+
+  /// Rs 5,000 genuine/counterfeit CNN.
   Future<Pkr5000CounterfeitClassifier>? _counterfeitCnn;
+
+  /// MobileNetV3-Small genuine/fake CNN for Rs 10-1,000. Only loaded when
+  /// kSmallCnnEnabled is true (it is false now, so this stays null).
   Future<MobileNetV3SmallClassifier>? _smallCnn;
+
+  /// Back-side monument classifier. Resolves to null if not installed.
   Future<MonumentClassifier?>? _monument;
 
   /// Scans by image path. A path is a unique captured file, so a retake is a
@@ -76,6 +148,8 @@ class OnDeviceCurrencyVerificationRepository
   final Map<String, Future<SideScan>> _scans = {};
 
   /// Prepares [path] and runs YOLO11s once; later calls reuse the result.
+  /// Called right after each photo is taken, so the work is usually done by
+  /// the time the user asks for the final analysis.
   Future<SideScan> scanSide(String path) {
     final cached = _scans[path];
     if (cached != null) return cached;
@@ -88,15 +162,22 @@ class OnDeviceCurrencyVerificationRepository
     return scan;
   }
 
+  /// Does the real work for one photo (no caching, see [scanSide]).
+  /// Steps: 1) prepare the image, 2) run YOLO11s, 3) run the optional
+  /// monument model, 4) convert boxes to image pixels and return a
+  /// [SideScan].
   Future<SideScan> _scan(String path) async {
     final sw = Stopwatch()..start();
+    // 1. Resize/prepare the photo and measure its quality.
     final prepared = await ImagePreprocessor.prepare(path);
     final prepareMs = sw.elapsedMilliseconds;
+    // 2. YOLO11s finds the note and its security features.
     final yolo = await (_yolo ??= _load(YoloDetector.load, 'YOLO11s'));
     final (raw, classMax) = await yolo.detect(prepared.yoloInput);
     final yoloMs = sw.elapsedMilliseconds - prepareMs;
 
-    // Optional monument model (Teachable Machine); ~tens of ms.
+    // 3. Optional monument model (Teachable Machine); ~tens of ms. A failure
+    //    here is only logged; it never stops the scan.
     final monumentModel = await (_monument ??= MonumentClassifier.tryLoad());
     MonumentPrediction? monument;
     if (monumentModel != null) {
@@ -124,6 +205,12 @@ class OnDeviceCurrencyVerificationRepository
   /// Releases cached scans that are no longer needed.
   void forget(Iterable<String> paths) => paths.forEach(_scans.remove);
 
+  /// Quick check done at capture time: which side does this photo show
+  /// (front, back, unknown), which denomination does it look like, and does
+  /// it look like a note at all? Reuses the cached [SideScan], so it is cheap.
+  ///
+  /// The monument prediction is only trusted when the monument model is
+  /// verified (finished). Input: [imagePath]. Output: a [SideCheck].
   @override
   Future<SideCheck> checkSide(String imagePath) async {
     final scan = await scanSide(imagePath);
@@ -154,15 +241,25 @@ class OnDeviceCurrencyVerificationRepository
   /// Below this a YOLO box is "seen but unconfirmed" and never counts.
   static const double confirmThreshold = CurrencyRules.minDetectionConfidence;
 
+  /// Label stored on the final result so the app knows where it came from.
   @override
   String get sourceLabel => 'on-device';
 
+  /// Loads a model and turns any error into a [VerificationException] with
+  /// a readable message. [what] is the model name used in that message.
   Future<T> _load<T>(Future<T> Function() loader, String what) =>
       loader().catchError((Object e) => throw VerificationException(
             VerificationErrorKind.unknown,
             'Could not load the $what model: $e',
           ));
 
+  /// THE FULL PIPELINE. Collects all evidence for one note.
+  ///
+  /// Inputs: [front] and [back] photos. Output: a [NoteAnalysisModel] with
+  /// either (a) a rejection (not a note / partial note) or (b) the evidence
+  /// for both sides plus classifier results. It never gives a verdict; the
+  /// VerificationEngine does that. Timings of each stage are stored in
+  /// `timingsMs` for debugging.
   @override
   Future<NoteAnalysisModel> analyzeBanknote({
     required NoteImageInput front,
@@ -172,8 +269,10 @@ class OnDeviceCurrencyVerificationRepository
     final timings = <String, int>{};
     int lap(Stopwatch s) => (s..stop()).elapsedMilliseconds;
 
+    // Temporary folder for cropped images; deleted in the `finally` at the end.
     final dir = await Directory.systemTemp.createTemp('fcd_');
     try {
+      // ---- Step 0: get both side scans ----
       // Usually already finished: each side is scanned right after capture.
       var sw = Stopwatch()..start();
       final (fs, bs) = await (scanSide(front.path), scanSide(back.path))
@@ -201,6 +300,7 @@ class OnDeviceCurrencyVerificationRepository
       debugPrint('YOLO front (${f.width}x${f.height}): $frontDets');
       debugPrint('YOLO back  (${b.width}x${b.height}): $backDets');
 
+      // ---- Gate: note box, shape and presence ----
       // 1. Is there a banknote on each side at all?
       final frontNote = _bestNote(frontDets);
       final backNote = _bestNote(backDets);
@@ -241,6 +341,8 @@ class OnDeviceCurrencyVerificationRepository
         );
       }
 
+      // 1c. Presence gate: a real note must show enough YOLO feature
+      //     evidence on each side. If not, return "not a banknote" now.
       final reasons = [
         ?NotePresence.rejection(frontDets, isFront: true),
         ?NotePresence.rejection(backDets, isFront: false),
@@ -257,6 +359,7 @@ class OnDeviceCurrencyVerificationRepository
         );
       }
 
+      // ---- Step 2: OCR of serial numbers and printed year ----
       // 2. OCR inside YOLO's serial-number and printed-year boxes.
       sw = Stopwatch()..start();
       final serialBoxes = _confirmed(frontDets, YoloClass.serialNumber);
@@ -295,6 +398,8 @@ class OnDeviceCurrencyVerificationRepository
               '${p.map((r) => '"${r.raw}" → "${r.text}"').join(' | ')}');
         }
 
+        // Wrap one chosen read, plus the raw text of both passes, for the
+        // result screen.
         SerialReadModel model(SerialRead r, List<SerialRead> pass) =>
             SerialReadModel(
               text: r.text,
@@ -302,6 +407,9 @@ class OnDeviceCurrencyVerificationRepository
               ocrReads: [for (final x in pass) x.raw],
             );
 
+        // With two regions, reconcile the passes of both serials together
+        // (the two serials should be equal, so each helps fix the other).
+        // Otherwise take the first non-empty read of each region.
         if (passes.length == 2) {
           final (a, b) = NoteTextParser.reconcile(passes[0], passes[1]);
           serials = [model(a, passes[0]), model(b, passes[1])];
@@ -346,6 +454,8 @@ class OnDeviceCurrencyVerificationRepository
         }
       }
 
+      // Printed year: confirmed box -> detected (with OCR value if read);
+      // only an unconfirmed box -> detected but low confidence; none -> missing.
       final yearUncertain = _uncertain(frontDets, YoloClass.printedYear).firstOrNull;
       final printedYear = yearBox != null
           ? PrintedYearModel(detected: true, value: yearValue, confidence: yearBox.score)
@@ -353,6 +463,7 @@ class OnDeviceCurrencyVerificationRepository
               ? PrintedYearModel(detected: true, confidence: yearUncertain.score)
               : const PrintedYearModel(detected: false, confidence: 1);
 
+      // ---- Step 2a: mark counting (lines / dots) ----
       // Count individual marks inside the best lines/dots box: YOLO boxes
       // the whole group (e.g. both Rs 1,000 dots in one box).
       sw = Stopwatch()..start();
@@ -372,6 +483,7 @@ class OnDeviceCurrencyVerificationRepository
       timings['marks'] = lap(sw);
       debugPrint('Marks counted: lines=$lineMarks dots=$dotMarks');
 
+      // ---- Build the per-side evidence ----
       final frontSide = SideDetectionModel(
         quality: f.quality,
         denomination: frontNote!.cls.denomination,
@@ -394,6 +506,7 @@ class OnDeviceCurrencyVerificationRepository
         sbpSeals: _count(backDets, YoloClass.sbpSeal, backMax),
       );
 
+      // ---- Step 2b: Rs 5,000 extras (microprint) ----
       // 2b. Rs 5,000 only: full-resolution inputs for the edge microprint
       //     and the genuine/counterfeit CNN. Other notes skip this work.
       final isRs5000 = frontNote.cls == YoloClass.rs5000 &&
@@ -417,7 +530,9 @@ class OnDeviceCurrencyVerificationRepository
         timings['microprint'] = lap(sw);
       }
 
+      // ---- Step 3: classifiers (CNNs) ----
       // 3. Rs 5,000 CNNs: only when YOLO says both sides are Rs 5,000.
+      // Variables below stay null when a model does not apply or did not run.
       AnomalyModel? anomaly;
       CounterfeitCnnModel? counterfeit;
       String? skipReason;
@@ -456,6 +571,8 @@ class OnDeviceCurrencyVerificationRepository
             '${frontNote.cls.denomination == null ? 'another note' : 'Rs ${frontNote.cls.denomination}'}';
 
         // Rs 10–1,000: separate MobileNetV3-Small genuine/fake classifier.
+        // SWITCHED OFF: the whole block below is skipped while
+        // kSmallCnnEnabled (currency_rules.dart) is false.
         // Only when both sides agree on a supported denomination; it never
         // runs for Rs 5,000. If it fails, report UNABLE TO VERIFY rather
         // than treating the note as genuine.
@@ -485,6 +602,8 @@ class OnDeviceCurrencyVerificationRepository
         }
       }
 
+      // ---- Step 4: assemble the evidence bundle ----
+      // The monument result comes from the back-side scan done earlier.
       timings['total'] = lap(total);
       debugPrint('Timings (ms): $timings');
 
@@ -513,14 +632,23 @@ class OnDeviceCurrencyVerificationRepository
         detections: detections,
       );
     } finally {
+      // Always remove the temporary crop folder, even after an error.
       dir.delete(recursive: true).ignore();
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Static helpers
+  // ---------------------------------------------------------------------------
+
+  /// Converts YOLO boxes from the letterboxed model input space back to
+  /// working-image pixels.
   static List<YoloDetection> _toImage(List<YoloDetection> dets, Letterbox lb) => [
         for (final d in dets) YoloDetection(d.cls, d.score, lb.toImage(d.box)),
       ];
 
+  /// Converts boxes to 0..1 fractions of the image size, so the UI can draw
+  /// them on any screen size.
   static SideDetectionsModel _sideDetections(
     List<YoloDetection> dets,
     PreparedImage img,
@@ -542,14 +670,19 @@ class OnDeviceCurrencyVerificationRepository
         ],
       );
 
+  /// The highest-scoring whole-note box (any denomination), or null if YOLO
+  /// found no note.
   static YoloDetection? _bestNote(List<YoloDetection> dets) =>
       dets.where((d) => d.cls.isNote).fold<YoloDetection?>(
           null, (best, d) => best == null || d.score > best.score ? d : best);
 
+  /// Boxes of class [c] with score at or above [confirmThreshold], best first.
   static List<YoloDetection> _confirmed(List<YoloDetection> dets, YoloClass c) =>
       dets.where((d) => d.cls == c && d.score >= confirmThreshold).toList()
         ..sort((a, b) => b.score.compareTo(a.score));
 
+  /// Boxes of class [c] below [confirmThreshold] ("seen but unconfirmed"),
+  /// best first.
   static List<YoloDetection> _uncertain(List<YoloDetection> dets, YoloClass c) =>
       dets.where((d) => d.cls == c && d.score < confirmThreshold).toList()
         ..sort((a, b) => b.score.compareTo(a.score));
@@ -578,11 +711,14 @@ class OnDeviceCurrencyVerificationRepository
     );
   }
 
+  /// Debug text listing the top score of every YOLO class.
   static String _fmtMax(List<double> m) => [
         for (final c in YoloClass.values)
           '${c.label}=${m[c.id].toStringAsFixed(3)}',
       ].join(' ');
 
+  /// Runs ML Kit text recognition on one image file and returns its text
+  /// lines with their confidence.
   static Future<List<OcrLine>> _ocr(TextRecognizer r, String path) async {
     final result = await r.processImage(InputImage.fromFilePath(path));
     return [
@@ -591,6 +727,8 @@ class OnDeviceCurrencyVerificationRepository
     ];
   }
 
+  /// Frees the native model resources. Call when the repository is no longer
+  /// needed.
   Future<void> dispose() async {
     await (await _yolo)?.close();
     (await _cnn)?.close();
