@@ -1,251 +1,89 @@
-# Counterfeit Currency Detection System
+# Pakistani Currency Note Screening System
 
-> **An On-Device Artificial Intelligence Solution for Pakistani Banknote Authentication**
+Final Year Project, Faculty of Computing, Riphah International University, Islamabad.
 
-[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen?style=for-the-badge&logo=githubactions)](https://github.com/Abdul-Manan-Kaleem/FYP-Fake-Currency-Detection/actions)
-[![Framework](https://img.shields.io/badge/Framework-Flutter%203.x-02569B?style=for-the-badge&logo=flutter)](https://flutter.dev)
-[![AI Engine](https://img.shields.io/badge/AI%20Engine-TensorFlow%20Lite-FF6F00?style=for-the-badge&logo=tensorflow)](https://www.tensorflow.org/lite)
-[![Architecture](https://img.shields.io/badge/Model-MobileNetV3--Small-412991?style=for-the-badge)](https://arxiv.org/abs/1905.02244)
-[![Target Currency](https://img.shields.io/badge/Target-Pakistani%20Rupee%20(PKR)-006600?style=for-the-badge)](https://www.sbp.org.pk)
+An Android app that screens a Pakistani banknote on the phone, with no server. The user photographs
+**both sides** of a note. The app finds the denomination and the printed security features, reads and
+compares the two serial numbers, adds classifier evidence, and shows a cautious result with the
+reasons behind it.
 
----
+> The app is a screening aid. **PASSED APP CHECKS** means the note passed this application's
+> programmed checks. It is not an official authentication by the State Bank of Pakistan.
 
-## Executive Summary
+## The app
 
-Counterfeit banknotes pose a significant economic threat to financial stability, business operations, and consumer trust—particularly in cash-dominant economies like Pakistan. Traditional verification methods rely on specialized ultraviolet (UV) lamps, magnetic sensors, or manual inspection by trained personnel, which are inaccessible to the general public.
+The current app is in **[`fake_currency_detector/`](fake_currency_detector/)**. Its own
+[README](fake_currency_detector/README.md) has the full details. (The first-term prototype that used to
+live in `app/` was removed; its history is still in git.)
 
-The **Counterfeit Currency Detection System** addresses this challenge by delivering an accessible, high-precision artificial intelligence authentication tool directly to smartphones. Utilizing an optimized **MobileNetV3-Small Convolutional Neural Network (CNN)** running locally via **TensorFlow Lite**, the application analyzes physical security features of Pakistani Rupee (PKR) banknotes (such as watermarks, micro-lettering, and security threads) in real time with **98.4% classification accuracy**—requiring zero cloud connectivity or external server infrastructure.
+How a note is checked:
 
----
+1. **Capture** both sides with the ML Kit document scanner (or gallery, or basic camera). After each
+   photo the app checks it is a banknote and that it is the right side.
+2. **Detect** the denomination and six features (printed year, SBP seal, security dots, security lines,
+   security thread, serial number) with **YOLO11s**.
+3. **Read** the two serial numbers and the printed year with ML Kit text recognition.
+4. **Classify** with MobileNetV3 models: two for Rs5,000 notes (alteration and genuine/counterfeit). A
+   MobileNetV3-Small model for Rs10 to Rs1,000 is built in but switched off for now
+   (`kSmallCnnEnabled` in `currency_rules.dart`).
+5. **Check the monument** printed on the back against the denomination.
+6. **Decide** with a rule engine that returns one of: PASSED APP CHECKS, SUSPICIOUS, UNABLE TO VERIFY,
+   FAKE (only for a clear monument mismatch), INCOMPLETE, or NOT A BANKNOTE. A poor photo or a missed
+   detection is never reported as a counterfeit.
 
-## Table of Contents
+Everything runs on the phone through TensorFlow Lite.
 
-- [Executive Summary](#executive-summary)
-- [Key Features & Innovations](#key-features--innovations)
-- [End-to-End System Architecture](#end-to-end-system-architecture)
-- [Artificial Intelligence & Model Methodology](#artificial-intelligence--model-methodology)
-- [Machine Learning Performance & Benchmarks](#machine-learning-performance--benchmarks)
-- [Application Structure & Module Map](#application-structure--module-map)
-- [User Experience & Screen Workflows](#user-experience--screen-workflows)
-- [Installation & Developer Setup Guide](#installation--developer-setup-guide)
-- [CI/CD & Cloud Compilation](#cicd--cloud-compilation)
-- [Hardware Lifecycle & Security Guard](#hardware-lifecycle--security-guard)
-- [Academic Project Metadata](#academic-project-metadata)
+## Recorded model results
 
----
+Taken from the training notebooks in this repository (test sets of each model):
 
-## Key Features & Innovations
+| Model | Task | Result |
+|---|---|---|
+| YOLO11s | Denominations and 6 features (348 usable test images) | mAP@0.50 0.9803, mAP@0.50:0.95 0.8722 |
+| MobileNetV3-Large | Rs5,000 genuine vs synthetically altered (141 images) | Accuracy 0.9433, ROC AUC 0.9885 |
+| MobileNetV3-Small | Rs10 to Rs1,000 genuine vs fake (332 images) | Accuracy 0.9669, ROC AUC 0.9961 |
+| Monument classifier | Building on the back, 7 monuments + invalid | 1.000 per monument, 0.985 invalid |
 
-### 1. 100% On-Device & Privacy-Preserving AI
-Inference executes entirely on the user's mobile device via TensorFlow Lite. Banknote scans never leave the smartphone, guaranteeing complete user privacy, zero data consumption, and instant offline availability in remote regions.
+These are model scores on their own test sets, not the accuracy of the whole app on real notes.
 
-### 2. Intelligent Document Scanning (CamScanner-Style UX)
-Integrated with **Google ML Kit Document Scanner**, the system automatically detects currency note edges in real time, crops out background noise (tables, hands, counters), and applies perspective unwarping to produce flat rectangular images for AI evaluation.
-
-### 3. Banknote Pre-Validation Sanity Check
-Before triggering deep learning inference, the application utilizes Google ML Kit Image Labeling to verify that the captured frame actually contains currency notes, preventing false execution on arbitrary non-banknote objects.
-
-### 4. Dual-Sided Scan Ensembling
-Recognizing that front and back note faces present distinct security features, the application guides users through a dual-sided capture sequence. Real/fake probabilities from both scans are mathematically averaged to eliminate single-perspective false positives.
-
-### 5. Interactive Security Feature Mapping
-Upon completing classification, the app renders localized bounding boxes directly over the captured image, visually highlighting critical verification zones including the **Watermark** and **Security Thread**.
-
----
-
-## End-to-End System Architecture
+## Repository layout
 
 ```
-                                  USER INTERFACE
-                                 [ Phone Camera ]
-                                        │
-                                        ▼
-                          [ ML Kit Document Scanner ]
-                       (Auto Edge Detection & Crop)
-                                        │
-                                        ▼
-                           Dual-Sided Image Capture
-                        ┌───────────────┴───────────────┐
-                        ▼                               ▼
-                 [ Front Image ]                 [ Back Image ]
-                        │                               │
-                        └───────────────┬───────────────┘
-                                        │
-                                        ▼
-                         [ Banknote Validation Check ]
-                         (ML Kit Image Labeler Sanity)
-                                        │
-                                        ▼
-                        [ Image Preprocessing Service ]
-               - EXIF Orientation & Matrix Crop (290x155)
-               - Contrast Boost (+25%) & Exposure (+10%)
-               - Tensor Down-Sampling to 224x224 Matrix
-                                        │
-                                        ▼
-                        [ On-Device TensorFlow Lite ]
-                     (MobileNetV3-Small Neural Network)
-                                        │
-                                        ▼
-                       [ Dual-Probability Ensembling ]
-               P_final = (P_front_real + P_back_real) / 2
-                                        │
-                                        ▼
-                          [ Analysis Verdict Screen ]
-             - Authentic / Counterfeit Classification Status
-             - Aggregated Confidence Score Percentage
-             - Bounding Box Overlay for Watermark & Thread
+fake_currency_detector/   Flutter app (current)
+  lib/                    App source code, commented file by file
+  assets/models/          The TensorFlow Lite models bundled in the APK
+  test/                   Automated tests (176 test cases)
+  tools/                  Training and parity helper scripts
+notebooks/                Earlier training notebooks
+model/                    Earlier exported model files
+monument_model_out/       Monument classifier labels and info
+Data-Set/                 Link to the dataset
+scripts/                  Python helper scripts
+docs/                     Project documentation and meeting notes
+CURRENCY_RULES.MD         The feature rules used for each denomination
 ```
 
----
+## Run it
 
-## Artificial Intelligence & Model Methodology
+You need the Flutter stable SDK (3.50 or newer) and JDK 21 for the Android build.
 
-### 1. Model Architecture
-The core classification model utilizes **MobileNetV3-Small**, a lightweight deep neural network designed using Hardware-Aware Network Architecture Search (NAS) and NetAdapt algorithms, optimized for mobile CPU/GPU execution.
-
-- **Input Dimension**: `224 × 224 × 3` RGB Tensor
-- **Feature Extraction**: Hard-Swish activation functions, depthwise separable convolutions, and Squeeze-and-Excitation (SE) attention blocks.
-- **Model Footprint**: `6.4 MB` quantized `.tflite` asset bundled inside the application package.
-- **Inference Speed**: `~45 milliseconds` per frame on modern smartphones.
-
-### 2. Mathematical Preprocessing Pipeline
-Raw hardware camera frames require mathematical normalization prior to neural network ingestion:
-
-1. **Bounding Box Isolation**: Calculates hardware-to-screen pixel ratios to isolate the `290 × 155` alignment frame.
-2. **Contrast & Exposure Boosting**: Algorithmically enhances contrast by **+25%** and exposure by **+10%** to highlight faint watermarks and micro-lettering.
-3. **Tensor Down-Sampling**: Employs bilinear interpolation to scale images down to the `224 × 224` matrix required by TensorFlow models.
-
----
-
-## Machine Learning Performance & Benchmarks
-
-During model development, five candidate deep learning architectures were trained and evaluated on the dataset to select the optimal model for mobile deployment:
-
-| Architecture | Accuracy | Precision | Recall | F1-Score | Inference Time | Model Size | Status |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **MobileNetV3-Small** | **98.4%** | **98.6%** | **98.2%** | **98.4%** | **~45 ms** | **6.4 MB** | **Selected (Production)** |
-| MobileNetV2 | 96.8% | 97.1% | 96.5% | 96.8% | ~68 ms | 14.2 MB | Evaluated |
-| EfficientNet-B0 | 97.5% | 97.8% | 97.2% | 97.5% | ~110 ms | 20.5 MB | Evaluated |
-| ResNet-50 | 98.1% | 98.3% | 97.9% | 98.1% | ~240 ms | 98.0 MB | Evaluated (Too Heavy) |
-| Custom 4-Layer CNN | 89.2% | 88.5% | 89.8% | 89.1% | ~35 ms | 4.1 MB | Evaluated (Underfitted) |
-
-*MobileNetV3-Small was selected for production due to its ideal balance of near-peak accuracy (98.4%), fast inference latency (~45 ms), and compact memory footprint (6.4 MB).*
-
----
-
-## Application Structure & Module Map
-
-```
-FYP-Fake-Currency-Detection/
-│
-├── app/                                    ← Primary Flutter Mobile Application
-│   ├── assets/
-│   │   └── models/
-│   │       └── currency_model.tflite       ← Bundled TensorFlow Lite Neural Network
-│   ├── android/                            ← Native Android Platform Configurations (minSdk 21)
-│   ├── ios/                                ← Native iOS Platform Configurations
-│   ├── lib/
-│   │   ├── main.dart                       ← Application Entry Point & Global Configuration
-│   │   ├── models/
-│   │   │   └── scan_model.dart             ← Typed Data Schema for Scan Records
-│   │   ├── services/
-│   │   │   ├── ml_service.dart             ← TFLite Inference Engine & ML Kit Integration
-│   │   │   ├── image_preprocessing_service.dart ← Tensor Resizing, Normalization & Cropping Math
-│   │   │   └── image_picker_service.dart   ← Native File System & Gallery Picker Utility
-│   │   └── screens/
-│   │       ├── splash_screen.dart          ← Boot Animation & Native Engine Binding
-│   │       ├── onboarding_screen.dart      ← First-Time User Interactive Walkthrough
-│   │       ├── main_navigation.dart        ← Tab Host utilizing Memory-Preserving IndexedStack
-│   │       ├── dashboard_tab.dart          ← Analytics Dashboard & Quick Scan Triggers
-│   │       ├── scan_tab.dart               ← Hardware Camera Controller & Live Scanner
-│   │       ├── processing_screen.dart      ← Step-by-Step AI Verification Progress View
-│   │       ├── result_screen.dart          ← Verdict View with Confidence & Feature Overlays
-│   │       └── history_tab.dart            ← Historical Scan Records Log
-│   └── pubspec.yaml                        ← Dependency Manifest & Asset Declarations
-│
-├── model/                                  ← Exported Keras & TFLite Model Files
-├── notebooks/                              ← Jupyter Notebooks for Training & Model Selection
-├── scripts/                                ← Python Utilities (Keras to TFLite Converter)
-├── Data-Set/                               ← Dataset Storage Links & Verification Manifests
-├── docs/                                   ← Technical Documentation & Presentation Material
-└── .github/workflows/
-    └── build_apk.yml                       ← CI/CD Cloud Pipeline for Release APK Compilation
-```
-
----
-
-## User Experience & Screen Workflows
-
-1. **Splash Screen**: Establishes asynchronous channel connections to native mobile operating system features before loading UI routes.
-2. **Onboarding Flow**: Introduces users to proper scanning practices (flat placement, adequate lighting, scanning both note faces).
-3. **Dashboard**: Presents historical verification statistics (total scans, real count, fake count) and instant scan launch buttons.
-4. **Smart Scanner**: Launches the live hardware camera with auto-focus, crop guides, flash toggles, and document perspective corrections.
-5. **AI Processing Center**: Animates the multi-step verification process (Image capture → Watermark pattern analysis → Microprint verification → Security thread check → Final scoring).
-6. **Results & Overlay Screen**: Highlights the verdict in high-contrast green (Authentic) or red (Counterfeit), displays exact confidence percentages, and projects security feature boxes over the image.
-
----
-
-## Installation & Developer Setup Guide
-
-### System Prerequisites
-- **Flutter SDK**: `Version 3.2.0 or higher` ([Install Instructions](https://docs.flutter.dev/get-started/install))
-- **Dart SDK**: `Version 3.2.0 to <4.0.0`
-- **Android Studio / Xcode**: Configured for Android (`minSdkVersion 21`) or iOS testing.
-
-### Quick Start Setup
 ```bash
-# 1. Clone the repository
 git clone https://github.com/Abdul-Manan-Kaleem/FYP-Fake-Currency-Detection.git
-
-# 2. Navigate to the core Flutter application directory
-cd FYP-Fake-Currency-Detection/app
-
-# 3. Retrieve package dependencies
+cd FYP-Fake-Currency-Detection/fake_currency_detector
 flutter pub get
-
-# 4. Connect a physical Android or iOS device and run the application
-flutter run
+flutter run                      # on a connected Android phone
+flutter test                     # run the automated tests
+flutter build apk --release --split-per-abi
 ```
 
----
+The APKs are written to `fake_currency_detector/build/app/outputs/flutter-apk/`. To open the project in
+Android Studio, open the `fake_currency_detector` folder.
 
-## CI/CD & Cloud Compilation
+## Cloud build
 
-The repository includes an automated **GitHub Actions** continuous integration pipeline configured in `.github/workflows/build_apk.yml`. 
+`.github/workflows/build_apk.yml` builds a release APK on GitHub Actions for pushes to `main` (or by hand
+from the Actions tab) and uploads it as an artifact.
 
-Whenever code updates are committed to the `main` branch, cloud build runners execute:
-1. Java JDK 17 & Flutter SDK environment initialization.
-2. Dependency installation (`flutter pub get`).
-3. Automated release APK compilation (`flutter build apk --release`).
-4. Artifact deployment, making downloadable `.apk` binaries immediately accessible under GitHub repository actions.
+## Team
 
----
-
-## Hardware Lifecycle & Security Guard
-
-To ensure high performance and prevent battery drain or memory leaks during active camera usage:
-
-- **Lifecycle Sweep**: Implements `WidgetsBindingObserver` to monitor mobile operating system app lifecycle states. If the user backgrounded or minimized the app, camera isolates are immediately closed and RAM is flushed.
-- **Resource Suppression**: Employs `TickerMode` to pause offscreen animation graphs during navigation transitions, preventing UI thread stutter.
-- **Memory Safety**: Immediately disposes raw 12-Megapixel byte streams post-cropping, restricting active memory usage to `<40 MB RAM`.
-
----
-
-## Academic Project Metadata
-
-- **Project Title**: Counterfeit Currency Detection System
-- **Academic Program**: Final Year Project (FYP-2)
-- **Department**: Department of Computer Science
-- **Academic Term**: 2025 – 2026
-
-### Project Team & Roles
-| Name | Project Role | Primary Focus |
-| :--- | :--- | :--- |
-| **M. Junaid Khan** | Project Supervisor | Academic Oversight & Architectural Guidance |
-| **Abdul Manan Kaleem** | Lead Developer | Mobile Application Engineering, Hardware Integration & Preprocessing |
-| **Raja Waleed Ahmad** | Machine Learning Specialist | Neural Network Training, Optimization & TFLite Conversion |
-| **M. Usman Ghulam** | QA & Documentation Lead | System Testing, Dataset Verification & Technical Documentation |
-
----
-
-*Developed at the Department of Computer Science — Building accessible, privacy-preserving AI tools for financial security.*
+Muhammad Usman, Abdul Manan Kaleem and M. Waleed bin Naeem. Supervisor: Mr. Junaid Khan.
