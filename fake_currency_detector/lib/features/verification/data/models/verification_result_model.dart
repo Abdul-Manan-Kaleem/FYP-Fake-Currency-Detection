@@ -8,19 +8,19 @@ import 'confidence_score_model.dart';
 import 'feature_check_model.dart';
 import 'note_analysis_model.dart';
 
-/// App outcomes. The conclusive ones are PASSED APP CHECKS, SUSPICIOUS and
-/// UNABLE TO VERIFY; INCOMPLETE and INVALID OBJECT are capture-flow states.
+/// App outcomes. The verdict is binary: REAL or FAKE. The other states are
+/// not verdicts: UNABLE TO VERIFY asks for a better photo, INCOMPLETE means a
+/// side is missing, and NOT A BANKNOTE means the image is not a note.
 enum VerificationVerdict {
   /// Passed every check the app ran. Not a certified authentication.
   real,
 
-  /// Some checks failed or were unclear, so the note needs a closer look.
-  suspicious,
-
-  /// Photocopy / printout on paper: shown as "Jaali Note / Fake Note".
+  /// Failed at least one check (a missing security feature, wrong or
+  /// patterned serial number, wrong monument, photocopy, ...).
   fake,
 
-  /// The app could not run enough checks to decide.
+  /// The app could not run enough checks to decide; the user should retake
+  /// the photos. This is NOT a fake verdict.
   unableToVerify,
 
   /// One or both sides of the note were not captured.
@@ -31,9 +31,8 @@ enum VerificationVerdict {
 
   /// Full text shown on the result screen.
   String get label => switch (this) {
-        real => 'PASSED APP CHECKS',
-        suspicious => 'SUSPICIOUS',
-        fake => 'JAALI NOTE / FAKE NOTE',
+        real => 'REAL NOTE',
+        fake => 'FAKE NOTE',
         unableToVerify => 'UNABLE TO VERIFY',
         incomplete => 'INCOMPLETE',
         notBanknote => 'INVALID OBJECT DETECTED',
@@ -41,8 +40,7 @@ enum VerificationVerdict {
 
   /// Shorter text for small spaces (for example history list).
   String get shortLabel => switch (this) {
-        real => 'PASSED APP CHECKS',
-        suspicious => 'SUSPICIOUS',
+        real => 'REAL',
         fake => 'FAKE',
         unableToVerify => 'UNABLE TO VERIFY',
         incomplete => 'INCOMPLETE',
@@ -51,14 +49,13 @@ enum VerificationVerdict {
 
   /// Word shown under the gauge percentage.
   String get gaugeCaption => switch (this) {
-        real => 'PASSED',
-        suspicious => 'SUSPICIOUS',
+        real => 'REAL',
         fake => 'FAKE',
         unableToVerify || incomplete || notBanknote => 'INCONCLUSIVE',
       };
 
-  /// True when the app reached a real decision (passed, suspicious or fake).
-  bool get isConclusive => this == real || this == suspicious || this == fake;
+  /// True when the app reached a decision (real or fake).
+  bool get isConclusive => this == real || this == fake;
 }
 
 /// Everything about one finished check: verdict, score, each feature check

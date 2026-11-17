@@ -89,7 +89,7 @@ class _MicroprintCameraScreenState extends State<MicroprintCameraScreen>
       setState(() => _controller = controller);
       _startLightMonitoring();
     } on Object catch (e) {
-      if (mounted) setState(() => _error = 'Camera nahi khul saka · Camera unavailable: $e');
+      if (mounted) setState(() => _error = 'Camera unavailable: $e');
     }
   }
 
@@ -179,7 +179,7 @@ class _MicroprintCameraScreenState extends State<MicroprintCameraScreen>
     } on Object catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Photo nahi li ja saki · Capture failed: $e')),
+          SnackBar(content: Text('Capture failed: $e')),
         );
         setState(() => _capturing = false);
       }
@@ -294,7 +294,7 @@ class _MicroprintCameraScreenState extends State<MicroprintCameraScreen>
   }
 }
 
-/// Instruction box over the preview (Urdu then English). Also shows the
+/// Instruction box over the preview (English). Also shows the
 /// current light level in lux when a light sensor is available.
 class _Hint extends StatelessWidget {
   const _Hint({required this.expected, required this.lux});
@@ -313,10 +313,8 @@ class _Hint extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        'Note ke kinare par chhoti "$expected" likhai ko box mein layen, '
-        'mobile ~10 cm door aur stable rakhen.\n'
-        'Put the tiny "$expected" text from the note\'s edge inside the box. '
-        'Tap the text to focus.'
+        'Put the tiny "$expected" text from the note\'s edge inside the box, '
+        'about 10 cm away and steady. Tap the text to focus.'
         '${lux == null ? '' : '  ·  Light: $lux lux'}',
         textAlign: TextAlign.center,
         style: const TextStyle(color: Colors.white, fontSize: 12.5, height: 1.35),

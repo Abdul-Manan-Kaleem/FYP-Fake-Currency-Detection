@@ -557,7 +557,7 @@ class _ReviewStepView extends StatelessWidget {
 }
 
 /// Pop-up shown when the scanned photo is rejected (wrong side, or not a
-/// banknote). Urdu text first, English below, one OK button.
+/// banknote). English message and one OK button.
 /// Red is used when it is not a banknote, amber for a wrong side.
 class _SideErrorDialog extends StatelessWidget {
   const _SideErrorDialog({required this.error});
@@ -599,23 +599,13 @@ class _SideErrorDialog extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              error.urdu,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
               error.english,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
             NeonButton(
-              label: 'THEEK HAI · OK',
+              label: 'OK',
               color: AppColors.amber,
               pulse: false,
               onPressed: () => Navigator.of(context).pop(),

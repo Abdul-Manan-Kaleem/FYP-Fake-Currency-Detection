@@ -158,8 +158,8 @@ class VerificationEngine {
         ),
         checks: const [],
         messages: [
-          'Jaali Note / Fake Note – Ye photocopy lag rahi hai.',
-          'This looks like a photocopy or printout on paper, not a real note.',
+          'Fake note: this looks like a photocopy or printout on paper, not a '
+              'real note.',
           ...analysis.rejectionReasons,
         ],
         analyzedAt: _now,
@@ -313,32 +313,30 @@ class VerificationEngine {
     }
 
     // ---- Step 6: choose the result state ----
-    // Band thresholds: 85 and above = authentic, 40 to 84 = suspicious,
-    // below 40 = counterfeit band.
+    // Band: 85 and above = authentic, anything lower = counterfeit.
     final band = ConfidenceScoreModel.bandFor(pct);
-    // Below the PASSED line every outcome is SUSPICIOUS; the score and its
-    // colour show how severe it is.
-    // A confidently wrong back-side monument means FAKE, even if every
+    // The verdict is binary: REAL or FAKE. There is no "suspicious" middle
+    // result. Any failed check (a missing security feature, wrong serial
+    // numbers, a patterned serial number, a wrong monument) means FAKE.
+    // A confidently wrong back-side monument also means FAKE, even if every
     // other check passed.
     final monumentFailed = checks.any(
         (c) => c.id == FeatureCheckId.monument && c.status == CheckStatus.fail);
-    final verdict = monumentFailed
+    final verdict = (monumentFailed ||
+            failures.isNotEmpty ||
+            band != ScoreBand.authentic)
         ? VerificationVerdict.fake
-        : band == ScoreBand.authentic
-            ? VerificationVerdict.real
-            : VerificationVerdict.suspicious;
+        : VerificationVerdict.real;
     final denom = _agreedDenomination(front, back) ?? front.denomination;
 
     // ---- Step 7: messages shown to the user ----
-    // Some lines are in Roman Urdu on purpose, for local users.
+    // All messages are in English.
     final skipped =
         checks.where((c) => c.status == CheckStatus.skipped).toList();
     final messages = <String>[
-      if (monumentFailed && denom != null) ...[
-        'Fake Note – Backside monument mismatch. $denom rupay pe '
-            '${CurrencyRules.monuments[denom]} honi chahiye.',
-        'Back side galat hai – Ye $denom ka asli note nahi lag raha.',
-      ],
+      if (monumentFailed && denom != null)
+        'Fake note: the monument on the back does not match. A Rs $denom '
+            'note should show ${CurrencyRules.monuments[denom]}.',
       if (failures.isEmpty && skipped.isEmpty)
         analysis.rs5000OnlyReason == null
             ? 'All YOLO11s security features and OCR serial checks passed, '
@@ -359,8 +357,8 @@ class VerificationEngine {
           checks.any((c) =>
               c.id == FeatureCheckId.microprint &&
               c.status == CheckStatus.skipped))
-        'Microprint unreadable – verified by alternate features '
-            '(Microprint parhi nahi ja saki – baqi features se tasdeeq hui).',
+        'Microprint could not be read, so the note was verified by its other '
+            'features.',
       if (verdict == VerificationVerdict.real)
         'PASSED APP CHECKS means the note passed this application\'s '
             'programmed checks; it is not a certified authentication.',
@@ -580,7 +578,27 @@ class VerificationEngine {
       );
     }
 
-    // Step 3: compare the two serials (ignoring case and spaces).
+    // Step 3: a real serial number looks random. A serial made of one repeated
+    // digit (0000000, 1111111) or an obvious pattern (1234567, 7654321,
+    // 1212121) is a fake. This is a critical failure and gives a FAKE result.
+    for (final (i, r) in reads.indexed) {
+      final pattern = serialPatternName(r.text);
+      if (pattern != null) {
+        return _check(
+          id: FeatureCheckId.serialNumber,
+          title: title,
+          weight: ScoreWeights.serialNumber,
+          status: CheckStatus.fail,
+          summary: 'Serial number ${i + 1} ("${r.text.trim()}") is not random: '
+              '$pattern',
+          confidence: r.confidence,
+          critical: true,
+          details: details,
+        );
+      }
+    }
+
+    // Step 4: compare the two serials (ignoring case and spaces).
     String norm(String s) => s.toUpperCase().replaceAll(RegExp(r'\s+'), '');
     final comparison = SerialComparisonModel(
       first: norm(reads[0].text),
@@ -603,6 +621,39 @@ class VerificationEngine {
       details: details,
       serial: comparison,
     );
+  }
+
+  /// Tells whether a serial number is "not random".
+  ///
+  /// Only the digits are looked at (the letters of the prefix are ignored) and
+  /// at least 6 digits are needed. Returns a short reason when the digits are
+  ///  * all the same digit (0000000, 1111111),
+  ///  * counting up or down in order (1234567, 7654321, 8901234), or
+  ///  * two digits repeating one after the other (1212121).
+  /// Returns null when the serial looks random (or has too few digits).
+  static String? serialPatternName(String serial) {
+    final digits = serial.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length < 6) return null;
+    final d = [for (final c in digits.split('')) int.parse(c)];
+
+    if (d.every((x) => x == d.first)) {
+      return 'the same digit repeated';
+    }
+    bool step(int by) {
+      for (var i = 1; i < d.length; i++) {
+        if ((d[i] - d[i - 1] + 10) % 10 != by) return false;
+      }
+      return true;
+    }
+
+    if (step(1)) return 'digits counting up in order';
+    if (step(9)) return 'digits counting down in order';
+    var alternating = d[0] != d[1];
+    for (var i = 2; i < d.length && alternating; i++) {
+      if (d[i] != d[i - 2]) alternating = false;
+    }
+    if (alternating) return 'two digits repeating';
+    return null;
   }
 
   /// Summary text used when a check was skipped because the YOLO11s
@@ -1356,8 +1407,8 @@ class VerificationEngine {
         title: title,
         weight: ScoreWeights.monument,
         status: CheckStatus.skipped,
-        summary: 'Thora saaf photo lein, monument clear nahi · '
-            'Monument not clear (${_pct(m.confidence)})',
+        summary: 'Monument not clear (${_pct(m.confidence)}) · '
+            'take a clearer photo',
         details: details,
       );
     }
@@ -1389,8 +1440,8 @@ class VerificationEngine {
       title: title,
       weight: ScoreWeights.monument,
       status: CheckStatus.fail,
-      summary: 'Back side galat hai – Ye $denomination ka asli note nahi lag '
-          'raha ($seenName instead of $expectedName)',
+      summary: 'Wrong back side: this is not a genuine Rs $denomination note '
+          '($seenName instead of $expectedName)',
       critical: true,
       details: details,
     );

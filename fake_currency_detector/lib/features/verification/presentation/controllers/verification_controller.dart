@@ -113,7 +113,7 @@ class VerificationController extends Notifier<VerificationState> {
       switch (result.verdict) {
         case VerificationVerdict.real:
           await Haptics.success();
-        case VerificationVerdict.suspicious || VerificationVerdict.fake:
+        case VerificationVerdict.fake:
           await Haptics.warning();
         default:
           await Haptics.tap();

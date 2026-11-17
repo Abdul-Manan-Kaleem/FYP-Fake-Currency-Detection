@@ -6,7 +6,7 @@ library;
 
 /// Which score range the percentage falls in (see [ConfidenceScoreModel.bandFor]).
 /// `inconclusive` means no usable score (shown as 0).
-enum ScoreBand { authentic, suspicious, counterfeit, inconclusive }
+enum ScoreBand { authentic, counterfeit, inconclusive }
 
 /// Why the raw score was reduced, if it was.
 /// - none: no penalty applied.
@@ -48,12 +48,10 @@ class ConfidenceScoreModel {
   final String? penaltyReason;
 
   /// Verdict threshold mapping from the scoring spec.
-  /// 85 and above = authentic, 40 to 84 = suspicious, below 40 = counterfeit.
-  static ScoreBand bandFor(int percentage) {
-    if (percentage >= 85) return ScoreBand.authentic;
-    if (percentage >= 40) return ScoreBand.suspicious;
-    return ScoreBand.counterfeit;
-  }
+  /// 85 and above = authentic, anything lower = counterfeit. There is no
+  /// "suspicious" band: the result is either real or fake.
+  static ScoreBand bandFor(int percentage) =>
+      percentage >= 85 ? ScoreBand.authentic : ScoreBand.counterfeit;
 
   /// Rebuilds the score from saved JSON.
   factory ConfidenceScoreModel.fromJson(Map<String, dynamic> json) =>

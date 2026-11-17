@@ -133,19 +133,15 @@ class CaptureState {
   }
 }
 
-/// Wrong-side message, in Roman Urdu with an English line.
+/// Wrong-side / rejected-photo message (English).
 class SideError {
   const SideError({
-    required this.urdu,
     required this.english,
-    this.title = 'GALAT SIDE · WRONG SIDE',
+    this.title = 'WRONG SIDE',
     this.notBanknote = false,
   });
 
-  /// Message in Roman Urdu (Urdu written in English letters).
-  final String urdu;
-
-  /// The same message in English.
+  /// The message shown to the user.
   final String english;
 
   /// Heading of the pop-up.
@@ -160,8 +156,6 @@ class SideError {
   static const notABanknote = SideError(
     title: 'INVALID IMAGE · NOT A NOTE',
     notBanknote: true,
-    urdu: 'Ye Pakistani note ki tasveer nahi hai. Poora note saaf roshni me, '
-        'sadi surface par rakh kar dobara scan karen.',
     english: 'This is not an image of a Pakistani banknote, so it was not '
         'accepted. Place the whole note flat on a plain surface in good light '
         'and scan it again.',
@@ -169,30 +163,24 @@ class SideError {
 
   /// The user scanned the back when the front was expected.
   static const backOnFront = SideError(
-    urdu: 'Ye note ki back side hai! Barah-e-meherbani pehle front side '
-        '(Quaid wali side) scan karen.',
     english: 'This is the BACK of the note. Please scan the FRONT '
         '(Quaid-e-Azam portrait side) first.',
   );
 
   /// The user scanned the front when the back was expected.
   static const frontOnBack = SideError(
-    urdu: 'Ye front side hai, ab back side (Building wali side) scan karen.',
     english: 'This is the FRONT. Now scan the BACK (building side).',
   );
 
   /// The back shows another note's monument than the front's denomination.
   static SideError wrongNote({required int found, required int scanning}) =>
       SideError(
-        urdu: 'Ye $found ka note hai, aap $scanning scan kar rahe hain.',
         english: 'This back belongs to a Rs $found note, but the front you '
             'scanned is Rs $scanning. Scan the back of the same note.',
       );
 
   /// The front was already scanned and the user scanned the front again.
   static const sameSideTwice = SideError(
-    urdu: 'Aap ne ye side pehle hi scan kar li hai. Ab back side '
-        '(Building wali side) scan karen.',
     english: 'You already scanned this side. Now scan the BACK (building side).',
   );
 }

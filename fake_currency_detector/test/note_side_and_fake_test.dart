@@ -70,20 +70,19 @@ void main() {
     });
   });
 
-  test('wrong-side messages are bilingual', () {
-    expect(SideError.backOnFront.urdu, contains('back side hai'));
-    expect(SideError.backOnFront.urdu, contains('Quaid wali side'));
-    expect(SideError.frontOnBack.urdu, contains('Building wali side'));
-    expect(SideError.sameSideTwice.urdu, contains('pehle hi scan kar li hai'));
+  test('wrong-side messages are English and non-empty', () {
+    expect(SideError.backOnFront.english, contains('BACK of the note'));
+    expect(SideError.frontOnBack.english, contains('building side'));
+    expect(SideError.sameSideTwice.english, contains('already scanned'));
     for (final e in [SideError.backOnFront, SideError.frontOnBack, SideError.sameSideTwice]) {
       expect(e.english, isNotEmpty);
     }
   });
 
-  group('photocopy → Jaali Note / Fake', () {
+  group('photocopy → Fake note', () {
     final engine = VerificationEngine(clock: () => DateTime(2026, 10, 31));
 
-    test('any denomination on paper is FAKE with the Urdu message', () {
+    test('any denomination on paper is FAKE with an English message', () {
       final r = engine.evaluate(const NoteAnalysisModel(
         isBanknote: false,
         banknoteConfidence: 0,
@@ -91,10 +90,10 @@ void main() {
         rejectionReasons: ['FRONT: white paper border / printer paper around the note'],
       ));
       expect(r.verdict, VerificationVerdict.fake);
-      expect(r.verdict.label, 'JAALI NOTE / FAKE NOTE');
+      expect(r.verdict.label, 'FAKE NOTE');
       expect(r.verdict.isConclusive, isTrue);
       expect(r.confidence.band, ScoreBand.counterfeit);
-      expect(r.messages.first, contains('Ye photocopy lag rahi hai'));
+      expect(r.messages.first, contains('photocopy or printout'));
       expect(r.messages.join(' '), isNot(contains('A4')));
     });
 
@@ -145,6 +144,6 @@ void main() {
       r.checks.firstWhere((c) => c.id == FeatureCheckId.microprint).status,
       CheckStatus.skipped,
     );
-    expect(r.messages.join(' '), contains('Microprint unreadable – verified by alternate features'));
+    expect(r.messages.join(' '), contains('Microprint could not be read'));
   });
 }

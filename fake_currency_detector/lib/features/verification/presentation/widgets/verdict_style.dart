@@ -14,13 +14,12 @@ import '../../data/models/verification_result_model.dart';
 
 /// Colour, gauge colours and icon for each [VerificationVerdict].
 ///
-/// Green means real, amber means suspicious or unverifiable, red means
+/// Green means real, amber means the note could not be verified, red means
 /// fake or not a banknote.
 extension VerdictStyle on VerificationVerdict {
   /// Main colour of the verdict.
   Color get color => switch (this) {
         VerificationVerdict.real => AppColors.emerald,
-        VerificationVerdict.suspicious => AppColors.amber,
         VerificationVerdict.fake => AppColors.crimson,
         VerificationVerdict.notBanknote => AppColors.crimson,
         VerificationVerdict.unableToVerify ||
@@ -28,10 +27,9 @@ extension VerdictStyle on VerificationVerdict {
           AppColors.amber,
       };
 
-  /// Gauge gradient. Suspicious blends amber into crimson.
+  /// Gauge gradient: green for real, red for fake, amber otherwise.
   List<Color> get gaugeColors => switch (this) {
         VerificationVerdict.real => const [Color(0xFF00B85C), AppColors.emerald],
-        VerificationVerdict.suspicious => const [AppColors.amber, AppColors.crimson],
         VerificationVerdict.fake => const [AppColors.crimson, AppColors.crimson],
         _ => const [AppColors.amber, AppColors.amber],
       };
@@ -39,7 +37,6 @@ extension VerdictStyle on VerificationVerdict {
   /// Icon of the verdict.
   IconData get icon => switch (this) {
         VerificationVerdict.real => Icons.verified_rounded,
-        VerificationVerdict.suspicious => Icons.report_problem_rounded,
         VerificationVerdict.fake => Icons.gpp_bad_rounded,
         VerificationVerdict.unableToVerify => Icons.blur_on_rounded,
         VerificationVerdict.incomplete => Icons.flip_rounded,

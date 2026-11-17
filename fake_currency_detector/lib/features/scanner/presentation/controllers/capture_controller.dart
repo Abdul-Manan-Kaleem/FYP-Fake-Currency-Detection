@@ -53,7 +53,7 @@ class CaptureController extends Notifier<CaptureState> {
       // Step 3: Front/back check right after capture. The same YOLO scan is reused
       // by the analysis, so this also makes "Analyze" faster later.
       state = state.copyWith(
-        busyMessage: 'Note ki side check ho rahi hai… · Checking side',
+        busyMessage: 'Checking side…',
       );
       final check = await _checkSide(result.path);
 

@@ -27,9 +27,9 @@ void main() {
       );
     });
 
-    test('mismatched serials → SUSPICIOUS at 32%', () {
+    test('mismatched serials → FAKE at 32%', () {
       final r = run(SampleAnalysis.mismatchedSerials);
-      expect(r.verdict, VerificationVerdict.suspicious);
+      expect(r.verdict, VerificationVerdict.fake);
       expect(r.confidence.percentage, 32);
       final serial =
           r.checks.firstWhere((c) => c.id == FeatureCheckId.serialNumber);
@@ -37,9 +37,9 @@ void main() {
       expect(serial.serialComparison!.mismatchCount, 2);
     });
 
-    test('missing back seals → suspicious at 58%', () {
+    test('missing back seals → FAKE at 58%', () {
       final r = run(SampleAnalysis.missingBackSeals);
-      expect(r.verdict, VerificationVerdict.suspicious);
+      expect(r.verdict, VerificationVerdict.fake);
       expect(r.confidence.percentage, 58);
     });
 
@@ -63,7 +63,7 @@ void main() {
       int dots = 0,
       int threads = 1,
       int seals = 1,
-      List<String> serials = const ['AB1234567', 'AB1234567'],
+      List<String> serials = const ['AB4718263', 'AB4718263'],
       double serialConf = 0.95,
       String? year = '2020',
     }) =>
@@ -110,9 +110,56 @@ void main() {
       expect(r.confidence.percentage, greaterThanOrEqualTo(85));
     });
 
+    // A real serial number looks random. Repeated digits or an obvious
+    // pattern make the note FAKE, even when both serials match.
+    for (final s in [
+      'AB0000000', 'AB1111111', 'AB2222222', 'AB1234567', 'AB7654321',
+      'AB8901234', 'AB1212121', '0000000000', '1234567890',
+    ]) {
+      test('patterned serial "$s" on both sides → FAKE', () {
+        final r = eval(front(serials: [s, s]), back());
+        expect(r.verdict, VerificationVerdict.fake);
+        expect(r.confidence.percentage, lessThan(40));
+        final serial =
+            r.checks.firstWhere((c) => c.id == FeatureCheckId.serialNumber);
+        expect(serial.status, CheckStatus.fail);
+        expect(serial.summary, contains('not random'));
+      });
+    }
+
+    for (final s in ['AB4718263', 'ATG8159424', 'GH3381902', 'RQ6604175']) {
+      test('random serial "$s" is accepted', () {
+        expect(VerificationEngine.serialPatternName(s), isNull);
+        expect(eval(front(serials: [s, s]), back()).verdict,
+            VerificationVerdict.real);
+      });
+    }
+
+    test('the verdict is only ever real or fake for a clear photograph', () {
+      for (final f in [
+        front(),
+        front(seals: 0),
+        front(lines: 0),
+        front(threads: 0),
+        front(year: null),
+      ]) {
+        final v = eval(f, back()).verdict;
+        expect(v == VerificationVerdict.real || v == VerificationVerdict.fake,
+            isTrue,
+            reason: 'got $v');
+      }
+    });
+
+    test('a missing required security feature is FAKE', () {
+      expect(eval(front(lines: 0), back()).verdict, VerificationVerdict.fake);
+      expect(eval(front(threads: 0), back()).verdict, VerificationVerdict.fake);
+      expect(eval(front(denom: 500, lines: 0, dots: 0), back(denom: 500)).verdict,
+          VerificationVerdict.fake);
+    });
+
     test('denomination mismatch drops below 40%', () {
       final r = eval(front(), back(denom: 50));
-      expect(r.verdict, VerificationVerdict.suspicious);
+      expect(r.verdict, VerificationVerdict.fake);
       expect(r.confidence.percentage, lessThan(40));
     });
 
@@ -133,20 +180,20 @@ void main() {
       expect(eval(front(lines: 1), back()).verdict, VerificationVerdict.real);
     });
 
-    test('more line regions than lines is suspicious', () {
+    test('more line regions than lines is fake', () {
       final r = eval(front(lines: 4), back());
       expect(r.verdict, isNot(VerificationVerdict.real));
       expect(r.confidence.percentage, lessThanOrEqualTo(84));
     });
 
-    test('dots on a lines note (Rs 100) is suspicious', () {
+    test('dots on a lines note (Rs 100) is fake', () {
       final r = eval(front(lines: 1, dots: 1), back());
-      expect(r.verdict, VerificationVerdict.suspicious);
+      expect(r.verdict, VerificationVerdict.fake);
     });
 
-    test('no line region on Rs 100 is suspicious', () {
+    test('no line region on Rs 100 is fake', () {
       final r = eval(front(lines: 0), back());
-      expect(r.verdict, VerificationVerdict.suspicious);
+      expect(r.verdict, VerificationVerdict.fake);
     });
 
     // Screenshot case: Rs 1,000 with both dots inside ONE dots box.
@@ -176,13 +223,13 @@ void main() {
     test('Rs 50 uses lines, not dots', () {
       final r = eval(front(denom: 50, lines: 0, dots: 1, threads: 0),
           back(denom: 50));
-      expect(r.verdict, VerificationVerdict.suspicious);
+      expect(r.verdict, VerificationVerdict.fake);
     });
 
-    test('Rs 1000 with no thread at all is suspicious', () {
+    test('Rs 1000 with no thread at all is fake', () {
       final r = eval(front(denom: 1000, lines: 0, dots: 1, threads: 0),
           back(denom: 1000));
-      expect(r.verdict, VerificationVerdict.suspicious);
+      expect(r.verdict, VerificationVerdict.fake);
     });
 
     test('two threads fail', () {
@@ -207,7 +254,7 @@ void main() {
       expect(r.verdict, isNot(VerificationVerdict.real));
     });
 
-    test('strong MobileNetV3 anomaly → suspicious', () {
+    test('strong MobileNetV3 anomaly → fake', () {
       final r = eval(front(), back(), anomaly: 0.8);
       expect(r.verdict, isNot(VerificationVerdict.real));
     });
@@ -345,12 +392,12 @@ void main() {
       expect(withBackSeals(3, 0).verdict, VerificationVerdict.real);
     });
 
-    test('2 confirmed + 1 low-confidence → unable to verify, not suspicious', () {
+    test('2 confirmed + 1 low-confidence → unable to verify, not fake', () {
       expect(withBackSeals(2, 1).verdict, VerificationVerdict.unableToVerify);
     });
 
-    test('2 confirmed and nothing else → suspicious', () {
-      expect(withBackSeals(2, 0).verdict, VerificationVerdict.suspicious);
+    test('2 confirmed and nothing else → fake', () {
+      expect(withBackSeals(2, 0).verdict, VerificationVerdict.fake);
     });
 
     test('low-confidence boxes never add to a count', () {
@@ -358,7 +405,7 @@ void main() {
     });
   });
 
-  test('Rs 1000 thread only faintly seen → unable to verify, not suspicious', () {
+  test('Rs 1000 thread only faintly seen → unable to verify, not fake', () {
     const q = ImageQualityModel(blurScore: 0.1, glareScore: 0.05, brightness: 0.5);
     final r = engine.evaluate(const NoteAnalysisModel(
       isBanknote: true,
@@ -450,7 +497,7 @@ void main() {
           small: const CounterfeitCnnModel(
               frontCounterfeit: 0.04, backCounterfeit: 0.93)));
       expect(small(r).status, CheckStatus.fail);
-      expect(r.verdict, VerificationVerdict.suspicious);
+      expect(r.verdict, VerificationVerdict.fake);
     });
 
     test('classifier could not run → UNABLE TO VERIFY, not a pass', () {
@@ -525,7 +572,7 @@ void main() {
     test('counterfeit ≥ 0.5 on either side → fails, never PASSED', () {
       final r = engine.evaluate(rs5000(back: 0.81));
       expect(cnn(r).status, CheckStatus.fail);
-      expect(r.verdict, VerificationVerdict.suspicious);
+      expect(r.verdict, VerificationVerdict.fake);
     });
 
     test('other denominations → both CNN checks N/A, not partial', () {

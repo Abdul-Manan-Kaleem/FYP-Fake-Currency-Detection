@@ -53,14 +53,14 @@ class AnalyzingScreen extends ConsumerStatefulWidget {
 /// State for [AnalyzingScreen]: runs the status-text timer and starts the
 /// verification once the first frame is drawn.
 class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
-  /// Status lines shown one after another (Roman Urdu + English).
+  /// Status lines shown one after another (English).
   /// They are only a visual cue. They are not tied to real progress.
   static const _stages = [
-    'Step 1: Front side check ho raha hai… · Checking front side',
-    'Step 2: Back side check ho raha hai… · Checking back side',
-    'Security features dekhe ja rahe hain… · Seals, thread, lines/dots',
-    'Serial number parha ja raha hai… · Reading serial numbers',
-    'Result tayyar ho raha hai… · Preparing result',
+    'Step 1: Checking front side…',
+    'Step 2: Checking back side…',
+    'Checking security features: seals, thread, lines/dots…',
+    'Reading serial numbers…',
+    'Preparing result…',
   ];
 
   /// Timer that moves to the next status line.

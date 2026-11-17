@@ -21,6 +21,7 @@ import '../widgets/confidence_gauge.dart';
 import '../widgets/detection_overlay.dart';
 import '../widgets/inspection_tile.dart';
 import '../widgets/note_identity_banner.dart';
+import '../widgets/security_features_card.dart';
 import '../widgets/verdict_badge.dart';
 import '../widgets/verdict_style.dart';
 
@@ -108,14 +109,13 @@ class ResultsScreen extends ConsumerWidget {
               // fixed bottom button.
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
               children: [
-                // Banner at the top: is it a Pakistani note, and
-                // which value.
-                NoteIdentityBanner(
-                  frontValue: result.analysis?.front?.denomination,
-                  backValue: result.analysis?.back?.denomination,
-                ),
-                const SizedBox(height: 12),
-                // Round gauge with the confidence percentage
+                // ORDER OF THIS SCREEN (top to bottom):
+                //  1. the final verdict (gauge, REAL / FAKE badge, summary),
+                //  2. the security features list,
+                //  3. the checklist and notes,
+                //  4. the scanned photographs of the note, at the bottom.
+                //
+                // 1. Final verdict. Round gauge with the confidence percentage
                 Center(
                   child: ConfidenceGauge(
                     percentage: result.confidence.percentage,
@@ -125,30 +125,45 @@ class ResultsScreen extends ConsumerWidget {
                     inconclusive: inconclusive,
                   ),
                 ),
-                // Verdict label (real, suspicious, fake, ...)
+                // Verdict label (REAL or FAKE; or the retake states)
                 Center(child: VerdictBadge(verdict: verdict)),
                 const SizedBox(height: 20),
-                // Red banner, only for a "fake" verdict. Two cases: a
-                // photocopy, or a back side that shows the wrong monument.
-                if (verdict == VerificationVerdict.fake) ...[
+                // Red banner, only when the note is fake because of a
+                // photocopy or a wrong monument on the back. (Other fake
+                // reasons are listed in the summary and the features list.)
+                if (verdict == VerificationVerdict.fake &&
+                    (result.analysis?.rejectionKind == 'photocopy' ||
+                        result.checks.any((c) =>
+                            c.id == FeatureCheckId.monument &&
+                            c.status == CheckStatus.fail))) ...[
                   result.analysis?.rejectionKind == 'photocopy'
                       ? const _FakeBanner(
-                          urdu: 'Ye photocopy lag rahi hai.',
                           english:
                               'This looks like a photocopy or printout on paper.',
                         )
                       : _FakeBanner(
-                          urdu: 'Back side galat hai – Ye '
-                              '${result.denomination ?? ''} ka asli note nahi lag raha.',
                           english: 'Backside monument mismatch: Rs '
                               '${result.denomination ?? ''} must show '
                               '${CurrencyRules.monuments[result.denomination] ?? 'its monument'}.',
                         ),
                   const SizedBox(height: 16),
                 ],
-                const SizedBox(height: 16),
                 // Summary in plain words: what happened and what to do
                 _SummaryCard(result: result),
+                // Which note it is: Pakistani banknote and its value
+                const SizedBox(height: 16),
+                NoteIdentityBanner(
+                  frontValue: result.analysis?.front?.denomination,
+                  backValue: result.analysis?.back?.denomination,
+                ),
+                // 2. Security features: one row each (dots, lines, thread,
+                // seals, serial numbers, year). Shown when checks ran.
+                if (result.checks.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  const _SectionHeader(title: 'SECURITY FEATURES'),
+                  const SizedBox(height: 10),
+                  SecurityFeaturesCard(result: result),
+                ],
                 // Notice listing checks that did not run (only when the
                 // verdict is conclusive)
                 if (!inconclusive &&
@@ -185,40 +200,7 @@ class ResultsScreen extends ConsumerWidget {
                     summary: microprintCheck.summary,
                   ),
                 ],
-                // "What we found on your note": the analysed photographs
-                // with a mark on everything the detector found. Front first,
-                // then back; a side with no detections is left out.
-                if (result.analysis?.detections.isNotEmpty ?? false) ...[
-                  const SizedBox(height: 24),
-                  const _SectionHeader(title: 'WHAT WE FOUND ON YOUR NOTE'),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Each box marks something the scanner found: the note '
-                    'value, SBP seals, serial numbers, the printed year, the '
-                    'security thread and the lines or dots. The chips list '
-                    'how many of each were found.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  for (final (key, label, path) in [
-                    ('front', 'FRONT', frontImagePath),
-                    ('back', 'BACK', backImagePath),
-                  ])
-                    if (result.analysis!.detections[key] case final d?)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: DetectionOverlayCard(
-                          side: label,
-                          imagePath: path,
-                          detections: d,
-                        ),
-                      ),
-                ],
-                // Inspection checklist; header shows "passed/applicable"
+                // 3. Inspection checklist; header shows "passed/applicable"
                 if (result.checks.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   _SectionHeader(
@@ -256,6 +238,39 @@ class ResultsScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
+                ],
+                // 4. The scanned note, at the bottom: the analysed photographs
+                // with a mark on everything the detector found. Front first,
+                // then back; a side with no detections is left out.
+                if (result.analysis?.detections.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 24),
+                  const _SectionHeader(title: 'SCANNED NOTE'),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Each box marks something the scanner found: the note '
+                    'value, SBP seals, serial numbers, the printed year, the '
+                    'security thread, and the security lines or dots. The '
+                    'chips list how many of each were found.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  for (final (key, label, path) in [
+                    ('front', 'FRONT', frontImagePath),
+                    ('back', 'BACK', backImagePath),
+                  ])
+                    if (result.analysis!.detections[key] case final d?)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: DetectionOverlayCard(
+                          side: label,
+                          imagePath: path,
+                          detections: d,
+                        ),
+                      ),
                 ],
                 // Technical details (collapsed): engine, raw score, time and
                 // stage timings. Developer detail stays out of the way until
@@ -342,7 +357,7 @@ List<FeatureCheckModel> _problemsFirst(List<FeatureCheckModel> checks) {
 }
 
 /// Plain-language answer at the top: what happened, why, and what to do.
-/// English first, then Roman Urdu (the wording the rest of the app uses).
+/// Written in English only.
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.result});
 
@@ -359,34 +374,21 @@ class _SummaryCard extends StatelessWidget {
           '${c.title}: ${c.summary}',
     ];
 
-    // Headline text for each verdict: English, then Roman Urdu.
-    final (headline, urdu) = switch (v) {
-      VerificationVerdict.real => (
-          'The note passed all of the app\'s checks.',
-          'Note ne tamam checks pass kar liye.',
-        ),
-      VerificationVerdict.suspicious => (
-          'Something does not look right. Check the items marked FAIL below.',
-          'Kuch theek nahi lag raha. Neeche FAIL wali cheezen dekhen.',
-        ),
-      VerificationVerdict.fake => (
-          'This looks like a fake note.',
-          'Ye jaali note lag raha hai.',
-        ),
-      VerificationVerdict.unableToVerify || VerificationVerdict.incomplete => (
-          'We could not verify this note. This does not mean it is fake.',
-          'Tasdeeq nahi ho saki. Iska matlab ye nahi ke note jaali hai.',
-        ),
-      VerificationVerdict.notBanknote => (
-          'This does not look like a banknote.',
-          'Ye note ki tasveer nahi lag rahi.',
-        ),
+    // Headline text for each verdict.
+    final headline = switch (v) {
+      VerificationVerdict.real =>
+        'The note passed all of the app\'s checks. It looks REAL.',
+      VerificationVerdict.fake =>
+        'This note is FAKE. At least one required check failed (see the '
+            'items marked FAIL below).',
+      VerificationVerdict.unableToVerify || VerificationVerdict.incomplete =>
+        'We could not verify this note. This does not mean it is fake.',
+      VerificationVerdict.notBanknote => 'This does not look like a banknote.',
     };
 
-    // Real, suspicious and fake are the "decided" outcomes.
-    final conclusive = v == VerificationVerdict.real ||
-        v == VerificationVerdict.suspicious ||
-        v == VerificationVerdict.fake;
+    // Real and fake are the "decided" outcomes.
+    final conclusive =
+        v == VerificationVerdict.real || v == VerificationVerdict.fake;
     // Advice line, only for the cases where the user should retake photos.
     final action = switch (v) {
       VerificationVerdict.unableToVerify ||
@@ -406,22 +408,13 @@ class _SummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Headline in English, then the Roman Urdu line
+          // Headline
           Text(
             headline,
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            urdu,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
               height: 1.35,
             ),
           ),
@@ -521,15 +514,12 @@ class _PartialBanner extends StatelessWidget {
   }
 }
 
-/// Red, bilingual banner for a "fake" verdict. Used for a photocopy or
-/// printout, and for a back side that shows the wrong monument.
+/// Red banner for a "fake" verdict. Used for a photocopy or printout, and
+/// for a back side that shows the wrong monument.
 class _FakeBanner extends StatelessWidget {
-  const _FakeBanner({required this.urdu, required this.english});
+  const _FakeBanner({required this.english});
 
-  /// Roman Urdu message.
-  final String urdu;
-
-  /// English message.
+  /// The reason, in English.
   final String english;
 
   @override
@@ -548,7 +538,7 @@ class _FakeBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Jaali Note / Fake Note',
+                  'Fake Note',
                   style: TextStyle(
                     color: AppColors.crimson,
                     fontWeight: FontWeight.w900,
@@ -557,17 +547,12 @@ class _FakeBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  urdu,
+                  english,
                   style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w700,
-                    fontSize: 15,
+                    fontSize: 14,
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  english,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
                 ),
               ],
             ),
@@ -1035,8 +1020,8 @@ class _BlurryCloseUpDialog extends StatelessWidget {
             const Icon(Icons.blur_on_rounded, color: AppColors.amber, size: 44),
             const SizedBox(height: 12),
             const Text(
-              'Focus clear nahi, thora qareeb layen aur mobile ko stable '
-              'rakhen, roshni me rakhen.',
+              'The photo is not in focus. Move a little closer, hold the '
+              'phone steady and use good light.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
@@ -1062,7 +1047,7 @@ class _BlurryCloseUpDialog extends StatelessWidget {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Phir bhi istemal karen · Use anyway'),
+              child: const Text('Use anyway'),
             ),
           ],
         ),

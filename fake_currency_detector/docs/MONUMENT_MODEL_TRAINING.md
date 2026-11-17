@@ -113,3 +113,23 @@ front shows "Ye 5000 ka note hai, aap 1000 scan kar rahe hain" and the photo is 
 **Before trusting FAKE verdicts, test the model on real notes.** A model that confuses two
 monuments would label real notes as fake. Check every denomination's back on at least 10 notes
 that were not in training.
+
+
+## 10-fold cross-validation
+
+To test how well the monument classifier works on photos it has not seen, run k-fold cross-validation
+(needs Python with tensorflow, numpy and pillow, and the sorted photo folder with one sub-folder per
+class):
+
+```bash
+python tools/train_monument.py --sorted ../monument_photos_sorted --folds 10 --cv-report monument_cv_10fold.json
+```
+
+Every photo is tested exactly once. Photos taken in the same minute always stay in the same fold, and
+every class is spread over all folds. A new model is trained for each fold. The script prints the accuracy
+of each fold and the mean and standard deviation, and writes them to the JSON report. It does not change
+the model installed in the app.
+
+Where the trained monument model is saved: `fake_currency_detector/assets/models/monument_classifier.tflite`
+(with `monument_labels.txt` and `monument_model_info.json` next to it, and a copy of the labels and info in
+`monument_model_out/`). The training script saves only the TensorFlow Lite file, not a Keras checkpoint.

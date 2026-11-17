@@ -83,9 +83,10 @@ void main() {
           modelAvailable: true, verified: true, label: 'monument_5000', confidence: 0.83)));
       expect(check(r).status, CheckStatus.fail);
       expect(r.verdict, VerificationVerdict.fake);
-      expect(r.messages.first,
-          'Fake Note – Backside monument mismatch. 100 rupay pe Ziarat Residency honi chahiye.');
-      expect(r.messages[1], 'Back side galat hai – Ye 100 ka asli note nahi lag raha.');
+      expect(
+          r.messages.first,
+          'Fake note: the monument on the back does not match. A Rs 100 note '
+          'should show Ziarat Residency.');
     });
 
     test('invalid (blurry copy / no monument) at 0.60+ is FAKE', () {
@@ -98,7 +99,7 @@ void main() {
       final r = engine.evaluate(rs100(const MonumentResultModel(
           modelAvailable: true, verified: true, label: 'monument_5000', confidence: 0.45)));
       expect(check(r).status, CheckStatus.skipped);
-      expect(check(r).summary, startsWith('Thora saaf photo lein, monument clear nahi'));
+      expect(check(r).summary, startsWith('Monument not clear'));
       expect(r.verdict, VerificationVerdict.real);
     });
 
@@ -150,7 +151,7 @@ void main() {
 
     test('wrong-note message', () {
       final e = SideError.wrongNote(found: 5000, scanning: 1000);
-      expect(e.urdu, 'Ye 5000 ka note hai, aap 1000 scan kar rahe hain.');
+      expect(e.english, contains('Rs 5000'));
       expect(e.english, isNotEmpty);
     });
   });
