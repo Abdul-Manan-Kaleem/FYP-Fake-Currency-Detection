@@ -390,6 +390,127 @@ def train(sorted_dir, out_dir, install, min_per_class, epochs, seed):
           'flutter build apk --release --split-per-abi')
 
 
+# ----------------------------------------------------------- cross-validation --
+
+def _build_and_fit(tf, xtr, ytr, xte, yte, n_classes, epochs, seed):
+    """Builds the same MobileNetV2 classifier as train() and fits it.
+
+    Used by cross_validate() so that every fold trains exactly like the final
+    model (frozen backbone first, then the top 30 layers fine-tuned).
+    """
+    tf.keras.utils.set_random_seed(seed)
+    base = tf.keras.applications.MobileNetV2(
+        input_shape=(SIZE, SIZE, 3), include_top=False, weights='imagenet', pooling='avg')
+    base.trainable = False
+    inp = tf.keras.Input((SIZE, SIZE, 3), name='image')   # already in [-1, 1]
+    x = base(inp, training=False)
+    x = tf.keras.layers.Dropout(0.25)(x)
+    out = tf.keras.layers.Dense(n_classes, activation='softmax', name='probs')(x)
+    model = tf.keras.Model(inp, out)
+
+    counts = np.bincount(ytr, minlength=n_classes)
+    class_weight = {i: len(ytr) / (n_classes * max(1, n)) for i, n in enumerate(counts)}
+
+    def ds(x, y, shuffle):
+        d = tf.data.Dataset.from_tensor_slices((x, y))
+        if shuffle:
+            d = d.shuffle(len(x), seed=seed, reshuffle_each_iteration=True)
+        return d.batch(32).map(
+            lambda a, b: (tf.cast(a, tf.float32) / 127.5 - 1.0, b)).prefetch(2)
+
+    train_ds, test_ds = ds(xtr, ytr, True), ds(xte, yte, False)
+    model.compile(optimizer=tf.keras.optimizers.Adam(1e-3),
+                  loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.fit(train_ds, epochs=epochs, class_weight=class_weight, verbose=2)
+    base.trainable = True
+    for layer in base.layers[:-30]:
+        layer.trainable = False
+    model.compile(optimizer=tf.keras.optimizers.Adam(1e-5),
+                  loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.fit(train_ds, epochs=max(3, epochs // 2), class_weight=class_weight, verbose=2)
+    return model, test_ds
+
+
+def cross_validate(sorted_dir, folds, epochs, seed, min_per_class, report_path):
+    """k-fold cross-validation of the monument classifier (default 10 folds).
+
+    Every photo is used for testing exactly once. Photos taken in the same
+    minute (a "burst") always stay in the same fold, so near-duplicate photos
+    can never sit in both the training part and the test part. Each class is
+    spread over the folds separately (stratified), so every fold sees every
+    class. A fresh model is trained for every fold, exactly like train().
+
+    Prints the accuracy of every fold and the mean and standard deviation,
+    and writes everything to [report_path] as JSON.
+    """
+    import tensorflow as tf
+
+    classes, train_items, test_items = build_dataset(sorted_dir, min_per_class, seed)
+    items = train_items + test_items
+    rng = random.Random(seed)
+
+    # Give every burst of photos a fold number, class by class.
+    fold_of = {}
+    for ci, _ in enumerate(classes):
+        groups = {}
+        for path, y in items:
+            if y == ci:
+                groups.setdefault(burst_key(path), []).append(path)
+        keys = sorted(groups)
+        rng.shuffle(keys)
+        if len(keys) < folds:
+            print(f'  warning: class {classes[ci]} has only {len(keys)} photo groups '
+                  f'for {folds} folds; some folds will have none of it in their test part')
+        for k_i, key in enumerate(keys):
+            for path in groups[key]:
+                fold_of[path] = k_i % folds
+
+    # Folds finished earlier are kept in <report>.partial, so a stopped run resumes.
+    partial = report_path + '.partial'
+    results = json.load(open(partial, encoding='utf8')) if os.path.exists(partial) else []
+    for k in range(folds):
+        if any(r['fold'] == k + 1 for r in results):
+            print(f'Fold {k + 1}/{folds}: already done, skipped')
+            continue
+        tr = [(p, y) for p, y in items if fold_of[p] != k]
+        te = [(p, y) for p, y in items if fold_of[p] == k]
+        print(f'\n===== Fold {k + 1}/{folds}: {len(tr)} training photos, {len(te)} test photos =====')
+        copies = max(1, min(20, 4000 // max(1, len(tr))))
+        xtr, ytr = materialise(tr, copies, seed + k)
+        xte, yte = materialise(te, 0, seed + 100 + k)
+        model, test_ds = _build_and_fit(tf, xtr, ytr, xte, yte, len(classes), epochs, seed + k)
+        pred = model.predict(test_ds, verbose=0).argmax(1)
+        per_class = {}
+        for i, c in enumerate(classes):
+            n = int((yte == i).sum())
+            per_class[c] = {'test_photos': n,
+                            'accuracy': round(float((pred[yte == i] == i).mean()), 4) if n else None}
+        overall = round(float((pred == yte).mean()), 4)
+        print(f'Fold {k + 1} accuracy: {overall:.4f}')
+        for c, r in per_class.items():
+            print(f'  {c:15s} {r["accuracy"]}  ({r["test_photos"]} photos)')
+        results.append({'fold': k + 1, 'train_photos': len(tr), 'test_photos': len(te),
+                        'accuracy': overall, 'per_class': per_class})
+        json.dump(results, open(partial, 'w', encoding='utf8'))
+        tf.keras.backend.clear_session()
+
+    accs = np.array([r['accuracy'] for r in results])
+    summary = {'folds': folds, 'mean_accuracy': round(float(accs.mean()), 4),
+               'std_accuracy': round(float(accs.std()), 4),
+               'min_accuracy': round(float(accs.min()), 4), 'max_accuracy': round(float(accs.max()), 4),
+               'classes': classes, 'epochs': epochs, 'seed': seed,
+               'source': os.path.abspath(sorted_dir),
+               'run_at': datetime.datetime.now().isoformat(timespec='seconds')}
+    print('\n===== Cross-validation summary =====')
+    for r in results:
+        print(f'  fold {r["fold"]:2d}: accuracy {r["accuracy"]:.4f}  ({r["test_photos"]} test photos)')
+    print(f'  mean {summary["mean_accuracy"]:.4f}  std {summary["std_accuracy"]:.4f}  '
+          f'min {summary["min_accuracy"]:.4f}  max {summary["max_accuracy"]:.4f}')
+    with open(report_path, 'w', encoding='utf8') as f:
+        json.dump({'summary': summary, 'folds': results}, f, indent=2)
+    print(f'Report written to {os.path.abspath(report_path)}')
+
+
 if __name__ == '__main__':
     here = os.path.dirname(os.path.abspath(__file__))
     app = os.path.dirname(here)
@@ -407,6 +528,11 @@ if __name__ == '__main__':
     ap.add_argument('--epochs', type=int, default=12)
     ap.add_argument('--seed', type=int, default=7)
     ap.add_argument('--sort-only', action='store_true', help='only auto-sort, do not train')
+    ap.add_argument('--folds', type=int, default=0,
+                    help='run k-fold cross-validation instead of training the final model '
+                         '(for example --folds 10); nothing is installed in the app')
+    ap.add_argument('--cv-report', default='monument_cv_report.json',
+                    help='where --folds writes its JSON report')
     a = ap.parse_args()
 
     if a.labelled:
@@ -414,5 +540,8 @@ if __name__ == '__main__':
     else:
         sorted_dir = a.sorted or auto_sort(a.photos, a.yolo)
     if a.sort_only:
+        sys.exit(0)
+    if a.folds:
+        cross_validate(sorted_dir, a.folds, a.epochs, a.seed, a.min_per_class, a.cv_report)
         sys.exit(0)
     train(sorted_dir, a.out, None if a.out else a.install, a.min_per_class, a.epochs, a.seed)

@@ -1,3 +1,11 @@
+/// Loads and runs the YOLO11s model that finds the denomination and the six
+/// security-feature regions.
+///
+/// In: a 640x640 letterboxed RGB tensor (a block of numbers) from
+/// ImagePreprocessor. Out: detections (class, score, box) via YoloDecoder.
+/// Model file: `assets/models/yolo11s_currency.tflite`.
+library;
+
 import 'dart:typed_data';
 
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -13,14 +21,22 @@ import 'yolo_decoder.dart';
 class YoloDetector {
   YoloDetector._(this._interpreter, this._isolate);
 
+  /// Path of the TFLite model file inside the app assets.
   static const String asset = 'assets/models/yolo11s_currency.tflite';
 
   /// Boxes come out divided by the input size (`_NormalizeCoords` in graph).
   static const bool normalizedBoxes = true;
 
+  /// The TFLite runtime object that holds the model.
   final Interpreter _interpreter;
+
+  /// Runs the model on a background isolate (worker thread) so the screen
+  /// does not freeze.
   final IsolateInterpreter _isolate;
 
+  /// Loads the model (4 CPU threads), checks input is [1,3,640,640] and
+  /// output is [1,17,8400] (17 = 4 box values + 13 classes), and starts the
+  /// background runner. Throws a StateError if the shapes differ.
   static Future<YoloDetector> load() async {
     final interpreter = await Interpreter.fromAsset(
       asset,
@@ -53,9 +69,12 @@ class YoloDetector {
     return next;
   }
 
+  /// Tail of the call queue used by [run] (one model call at a time).
   Future<void> _queue = Future.value();
 
   /// Post-NMS detections plus each class's highest raw score.
+  /// Step 1: run the model. Step 2: decode boxes with NMS. Step 3: also
+  /// return each class's top score, even below the 0.25 threshold.
   Future<(List<YoloDetection>, List<double>)> detect(Float32List chw) async {
     final raw = await run(chw);
     return (
@@ -64,6 +83,7 @@ class YoloDetector {
     );
   }
 
+  /// Stops the background runner and frees the model's memory.
   Future<void> close() async {
     await _isolate.close();
     _interpreter.close();

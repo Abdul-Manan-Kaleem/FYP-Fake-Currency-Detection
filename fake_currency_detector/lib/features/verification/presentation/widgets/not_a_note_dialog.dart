@@ -1,3 +1,11 @@
+/// "Not a note" dialog: a warning pop-up for images that cannot be checked.
+///
+/// Tells the user the photo is not a proper banknote image (invalid object,
+/// paper/A4 page, or only part of a note) and offers "RETAKE SCAN".
+/// Opened by showNotANoteDialog in analyzing_screen.dart.
+/// Input: optional reasons, "what to do" steps, and a kind of rejection.
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -8,6 +16,10 @@ import '../../../../core/widgets/pulsing_glow.dart';
 /// High-tech rejection modal shown when `isBanknote == false`.
 ///
 /// Completes when the user taps "Retake Scan".
+///
+/// [reasons] are small grey lines of explanation. [steps] are advice lines
+/// (the first is styled as a heading). [kind] is 'paper', 'partial' or null
+/// and picks the wording. It cannot be dismissed by tapping outside.
 Future<void> showNotANoteDialog(
   BuildContext context, {
   List<String> reasons = const [],
@@ -38,6 +50,7 @@ Future<void> showNotANoteDialog(
   );
 }
 
+/// The dialog content. Fields match [showNotANoteDialog].
 class _NotANoteDialog extends StatelessWidget {
   const _NotANoteDialog({
     required this.reasons,
@@ -45,6 +58,7 @@ class _NotANoteDialog extends StatelessWidget {
     required this.kind,
   });
 
+  /// Extra explanation lines shown under the main text.
   final List<String> reasons;
 
   /// "What to do" lines, shown left-aligned.
@@ -53,18 +67,21 @@ class _NotANoteDialog extends StatelessWidget {
   /// 'paper' (A4 / printout), 'partial' (half / cut-off note) or null.
   final String? kind;
 
+  /// Heading text for this [kind].
   String get _title => switch (kind) {
     'paper' => 'NOT A PROPER IMAGE',
     'partial' => 'INCOMPLETE NOTE IMAGE',
     _ => 'INVALID OBJECT DETECTED',
   };
 
+  /// Optional amber line under the heading (null for the default kind).
   String? get _subtitle => switch (kind) {
     'paper' => 'PAPER / A4 PAGE DETECTED',
     'partial' => 'HALF / PARTIAL NOTE DETECTED',
     _ => null,
   };
 
+  /// Main explanation paragraph for this [kind].
   String get _body => switch (kind) {
     'paper' =>
       'You scanned a sheet of paper (an A4 page, printout or '
@@ -80,6 +97,7 @@ class _NotANoteDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // PopScope blocks the Android back button, so the user must tap Retake.
     return PopScope(
       canPop: false,
       child: SafeArea(
@@ -90,6 +108,7 @@ class _NotANoteDialog extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 420),
               child: Material(
                 color: Colors.transparent,
+                // Red-tinted glass card (crimson at 10% blended over surface).
                 child: GlassContainer(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                   borderRadius: 28,
@@ -104,6 +123,7 @@ class _NotANoteDialog extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Pulsing warning icon.
                         const PulsingGlow(
                           color: Color(0xFFFF5722),
                           size: 84,
@@ -113,6 +133,7 @@ class _NotANoteDialog extends StatelessWidget {
                             color: Color(0xFFFF6E40),
                           ),
                         ),
+                        // Heading.
                         Text(
                           _title,
                           textAlign: TextAlign.center,
@@ -123,6 +144,7 @@ class _NotANoteDialog extends StatelessWidget {
                             fontSize: 18,
                           ),
                         ),
+                        // Optional subtitle.
                         if (_subtitle != null) ...[
                           const SizedBox(height: 4),
                           Text(
@@ -137,11 +159,13 @@ class _NotANoteDialog extends StatelessWidget {
                           ),
                         ],
                         const SizedBox(height: 12),
+                        // Main explanation.
                         Text(
                           _body,
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
+                        // Extra reason lines, if any.
                         if (reasons.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           for (final r in reasons)
@@ -154,6 +178,7 @@ class _NotANoteDialog extends StatelessWidget {
                               ),
                             ),
                         ],
+                        // "What to do" box. The first line is styled as a heading.
                         if (steps.isNotEmpty) ...[
                           const SizedBox(height: 14),
                           Container(
@@ -190,6 +215,7 @@ class _NotANoteDialog extends StatelessWidget {
                           ),
                         ],
                         const SizedBox(height: 24),
+                        // Button that closes the dialog so the user can rescan.
                         NeonButton(
                           label: 'RETAKE SCAN',
                           icon: Icons.document_scanner_outlined,

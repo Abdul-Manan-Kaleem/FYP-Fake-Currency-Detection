@@ -20,43 +20,73 @@ import '../widgets/not_a_note_dialog.dart';
 import '../widgets/radar_scanner.dart';
 import 'results_screen.dart';
 
-/// Processing state: radar sweep while the pipeline runs, then routes to the
-/// results dashboard or the "not a banknote" alert.
+/// "Analyzing" screen. It sits between the capture screens and the results.
+///
+/// Flow: the user photographs the FRONT and BACK of the note, then this
+/// screen opens and starts the on-device check (verificationController).
+///
+/// What it shows, from top to bottom:
+///  1. Title "ANALYZING BANKNOTE".
+///  2. A small chip naming the on-device tools used.
+///  3. A radar animation with a status line that changes every 700 ms.
+///  4. Thumbnails of the front and back photos with a laser sweep.
+///  5. A thin progress bar at the bottom.
+///
+/// When the check ends, the screen reacts to the controller status:
+///  - completed: replaces itself with the ResultsScreen.
+///  - rejected: shows the "not a banknote" dialog, then reopens the camera.
+///  - failed: shows an error panel with RETRY and "Back to capture".
 class AnalyzingScreen extends ConsumerStatefulWidget {
+  /// The two photos taken by the user. Either can be null if missing.
   const AnalyzingScreen({super.key, this.front, this.back});
 
+  /// Photo of the front side of the note.
   final CapturedImage? front;
+
+  /// Photo of the back side of the note.
   final CapturedImage? back;
 
   @override
   ConsumerState<AnalyzingScreen> createState() => _AnalyzingScreenState();
 }
 
+/// State for [AnalyzingScreen]: runs the status-text timer and starts the
+/// verification once the first frame is drawn.
 class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
+  /// Status lines shown one after another (English).
+  /// They are only a visual cue. They are not tied to real progress.
   static const _stages = [
-    'Step 1: Front side check ho raha hai… · Checking front side',
-    'Step 2: Back side check ho raha hai… · Checking back side',
-    'Security features dekhe ja rahe hain… · Seals, thread, lines/dots',
-    'Serial number parha ja raha hai… · Reading serial numbers',
-    'Result tayyar ho raha hai… · Preparing result',
+    'Step 1: Checking front side…',
+    'Step 2: Checking back side…',
+    'Checking security features: seals, thread, lines/dots…',
+    'Reading serial numbers…',
+    'Preparing result…',
   ];
 
+  /// Timer that moves to the next status line.
   Timer? _ticker;
+
+  /// Index of the status line currently shown.
   int _stage = 0;
 
   @override
   void initState() {
     super.initState();
+    // Every 700 ms show the next status line (wraps back to the first).
     _ticker = Timer.periodic(const Duration(milliseconds: 700), (_) {
       if (mounted) setState(() => _stage = (_stage + 1) % _stages.length);
     });
+    // Start the check after the first frame, so the screen is already visible.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
+  /// Turns a captured photo into the input object the checker needs.
+  /// Returns null when that side was not captured.
   static NoteImageInput? _input(CapturedImage? image) => image == null
       ? null
       : NoteImageInput(path: image.path);
 
+  /// Starts the on-device check. Also used by the RETRY button.
   void _start() {
     ref.read(verificationControllerProvider.notifier).verify(
           front: _input(widget.front),
@@ -64,12 +94,16 @@ class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
         );
   }
 
+  // Stop the timer when the screen closes.
   @override
   void dispose() {
     _ticker?.cancel();
     super.dispose();
   }
 
+  /// Called when the image was rejected (for example "not a banknote").
+  /// Shows a dialog, clears the old state, goes back and reopens the camera
+  /// for a new FRONT photo.
   Future<void> _onRejected(List<String> messages, String? kind) async {
     // First message repeats the dialog body; the rest are the gate's reasons
     // plus, for paper, the "What to do" steps.
@@ -95,6 +129,7 @@ class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the controller status and navigate when the check finishes.
     ref.listen(verificationControllerProvider, (prev, next) {
       if (prev?.status == next.status) return;
       switch (next.status) {
@@ -125,10 +160,12 @@ class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
 
     return Scaffold(
       body: CyberBackground(
+        // Red glow on error, cyan while working.
         accent: failed ? AppColors.crimson : AppColors.cyan,
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            // Error panel if the check failed, otherwise the progress view.
             child: failed
                 ? _ErrorPanel(
                     title: state.error!.title,
@@ -142,17 +179,21 @@ class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
                 : Column(
                     children: [
                       const SizedBox(height: 8),
+                      // Title
                       Text(
                         'ANALYZING BANKNOTE',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 6),
+                      // Chip naming the tools used (all run on the phone)
                       _EngineChip(
-                        label: 'ON-DEVICE · YOLO11s + ML Kit OCR + Rs 5,000 CNN',
+                        label: 'ON-DEVICE · YOLO11s + ML Kit OCR + CNN classifiers',
                       ),
                       const Spacer(),
+                      // Radar animation in the middle
                       const RadarScanner(size: 230),
                       const SizedBox(height: 28),
+                      // Status line, fades between texts (key = stage index)
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 250),
                         child: Text(
@@ -166,6 +207,7 @@ class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
                         ),
                       ),
                       const Spacer(),
+                      // Front and back photo thumbnails side by side
                       Row(
                         children: [
                           Expanded(child: _Thumb(image: widget.front, label: 'FRONT')),
@@ -174,6 +216,7 @@ class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+                      // Thin endless progress bar at the bottom
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: const LinearProgressIndicator(
@@ -191,9 +234,11 @@ class _AnalyzingScreenState extends ConsumerState<AnalyzingScreen> {
   }
 }
 
+/// Small rounded chip under the title that shows the text in [label].
 class _EngineChip extends StatelessWidget {
   const _EngineChip({required this.label});
 
+  /// Text shown inside the chip (kept to one line, cut with "..." if long).
   final String label;
 
   @override
@@ -215,10 +260,15 @@ class _EngineChip extends StatelessWidget {
   }
 }
 
+/// Small preview of one captured photo with a moving laser line and a
+/// FRONT / BACK label. Shows a plain dark box if the photo is missing.
 class _Thumb extends StatelessWidget {
   const _Thumb({required this.image, required this.label});
 
+  /// The photo to preview (null if that side was not captured).
   final CapturedImage? image;
+
+  /// Label drawn in the top-left corner.
   final String label;
 
   @override
@@ -236,6 +286,7 @@ class _Thumb extends StatelessWidget {
                 Image.file(File(image!.path), fit: BoxFit.cover)
               else
                 const ColoredBox(color: AppColors.surface),
+              // Light dark tint so the label stays readable on the photo
               Container(color: AppColors.onyx.withValues(alpha: 0.35)),
               Positioned(
                 left: 8,
@@ -258,6 +309,8 @@ class _Thumb extends StatelessWidget {
   }
 }
 
+/// Red card shown when the check failed (see VerificationStatus.failed).
+/// Offers RETRY and a way back to the capture screen.
 class _ErrorPanel extends StatelessWidget {
   const _ErrorPanel({
     required this.title,
@@ -266,9 +319,16 @@ class _ErrorPanel extends StatelessWidget {
     required this.onBack,
   });
 
+  /// Short error heading.
   final String title;
+
+  /// Longer explanation of what went wrong.
   final String message;
+
+  /// Runs the check again.
   final VoidCallback onRetry;
+
+  /// Clears the state and returns to the capture screen.
   final VoidCallback onBack;
 
   @override

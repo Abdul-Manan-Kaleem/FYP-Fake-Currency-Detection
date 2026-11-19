@@ -6,6 +6,10 @@ import '../../domain/capture_models.dart';
 
 /// Viewfinder-style frame with corner brackets, laser sweep and a ghost
 /// banknote outline. Tapping it launches the native scanner.
+///
+/// Shown on the front/back step of the capture screen. It is only a
+/// decorative frame plus a tap target; it does not use the camera itself.
+/// While busy it shows a spinner and ignores taps.
 class ScannerHud extends StatelessWidget {
   const ScannerHud({
     super.key,
@@ -14,8 +18,13 @@ class ScannerHud extends StatelessWidget {
     this.busy = false,
   });
 
+  /// Which side is being scanned (changes the icon and the labels).
   final NoteSide side;
+
+  /// Called when the frame is tapped.
   final VoidCallback? onTap;
+
+  /// True while a scan is running: shows a spinner and stops the laser.
   final bool busy;
 
   @override
@@ -23,6 +32,7 @@ class ScannerHud extends StatelessWidget {
     return GestureDetector(
       onTap: busy ? null : onTap,
       child: AspectRatio(
+        // 1.8 : 1 is roughly the shape of a banknote.
         aspectRatio: 1.8,
         child: Container(
           decoration: BoxDecoration(
@@ -43,8 +53,10 @@ class ScannerHud extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
+                  // Layer 1: faint note outline. Layer 2: corner brackets.
                   const CustomPaint(painter: _NoteGhostPainter()),
                   const CustomPaint(painter: _BracketPainter()),
+                  // Centre: spinner while busy, otherwise icon + prompt.
                   Center(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
@@ -80,6 +92,7 @@ class ScannerHud extends StatelessWidget {
                             ),
                     ),
                   ),
+                  // Small corner labels.
                   Positioned(
                     left: 14,
                     top: 12,
@@ -100,6 +113,7 @@ class ScannerHud extends StatelessWidget {
   }
 }
 
+/// Tiny, faint cyan text used in the corners of the frame.
 class _HudLabel extends StatelessWidget {
   const _HudLabel({required this.text});
 
@@ -119,11 +133,14 @@ class _HudLabel extends StatelessWidget {
   }
 }
 
+/// Draws the four glowing "L" shaped corner brackets of the viewfinder.
 class _BracketPainter extends CustomPainter {
   const _BracketPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
+    // inset: gap from the edge. len: bracket arm length (16% of the
+    // shorter side).
     const inset = 8.0;
     final len = size.shortestSide * 0.16;
     final r = Rect.fromLTRB(inset, inset, size.width - inset, size.height - inset);
@@ -145,6 +162,7 @@ class _BracketPainter extends CustomPainter {
       ..lineTo(r.left, r.bottom)
       ..lineTo(r.left, r.bottom - len);
 
+    // Pass 1: thick, blurred, see-through line = glow.
     canvas.drawPath(
       path,
       Paint()
@@ -154,6 +172,7 @@ class _BracketPainter extends CustomPainter {
         ..color = AppColors.cyan.withValues(alpha: 0.4)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
+    // Pass 2: thinner solid line on top.
     canvas.drawPath(
       path,
       Paint()
@@ -174,6 +193,7 @@ class _NoteGhostPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Rounded rectangle 28 px inside the frame.
     final r = RRect.fromRectAndRadius(
       Rect.fromLTRB(28, 28, size.width - 28, size.height - 28),
       const Radius.circular(8),
@@ -183,6 +203,7 @@ class _NoteGhostPainter extends CustomPainter {
       ..strokeWidth = 1
       ..color = Colors.white.withValues(alpha: 0.16);
 
+    // Dashed line: draw 5 px of the outline, skip 5 px, repeat.
     final path = Path()..addRRect(r);
     for (final metric in path.computeMetrics()) {
       for (var d = 0.0; d < metric.length; d += 10) {
@@ -190,7 +211,8 @@ class _NoteGhostPainter extends CustomPainter {
       }
     }
 
-    // Hint at the thread & watermark zones.
+    // Hint at the thread & watermark zones: a vertical line 62% across
+    // (thread) and an oval near the left (watermark).
     final threadX = r.left + r.width * 0.62;
     canvas.drawLine(
       Offset(threadX, r.top + 4),

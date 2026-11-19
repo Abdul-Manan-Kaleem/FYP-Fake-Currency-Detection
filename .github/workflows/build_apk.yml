@@ -8,16 +8,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # The Android build of the current app needs JDK 21 (Android Gradle Plugin 9.x).
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
@@ -25,17 +26,19 @@ jobs:
           channel: 'stable'
 
       - name: Install Dependencies
-        working-directory: ./app
+        working-directory: ./fake_currency_detector
         run: flutter pub get
 
+      - name: Run Tests
+        working-directory: ./fake_currency_detector
+        run: flutter test
+
       - name: Compile Release APK
-        working-directory: ./app
-        run: flutter build apk --release --no-tree-shake-icons
+        working-directory: ./fake_currency_detector
+        run: flutter build apk --release --split-per-abi
 
       - name: Upload APK to GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: Counterfeit-Detection-App-APK
-          path: |
-            app/build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-release.apk
+          name: Currency-Screening-App-APK
+          path: fake_currency_detector/build/app/outputs/flutter-apk/*.apk

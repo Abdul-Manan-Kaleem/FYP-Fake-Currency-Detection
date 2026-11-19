@@ -8,9 +8,13 @@ import '../../domain/capture_models.dart';
 
 /// Animated 3D card flip that shows the captured FRONT turning over to an
 /// empty BACK, prompting the user to flip the physical note.
+///
+/// Used on the "flip" step of the capture screen. It loops forever and
+/// has no buttons.
 class FlipPrompt extends StatefulWidget {
   const FlipPrompt({super.key, required this.front});
 
+  /// The accepted front photo shown on the front face (grey box if null).
   final CapturedImage? front;
 
   @override
@@ -19,6 +23,7 @@ class FlipPrompt extends StatefulWidget {
 
 class _FlipPromptState extends State<FlipPrompt>
     with SingleTickerProviderStateMixin {
+  /// One full loop (front -> back -> front) takes 2.6 seconds, repeating.
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2600),
@@ -36,6 +41,8 @@ class _FlipPromptState extends State<FlipPrompt>
       animation: _c,
       builder: (context, _) {
         // Hold on front, flip, hold on back, flip back.
+        // t is the loop progress (0 to 1); turn goes 0 (front) to 1 (back):
+        // 0-30% hold front, 30-50% flip, 50-80% hold back, 80-100% flip back.
         final t = _c.value;
         final double turn;
         if (t < 0.3) {
@@ -47,19 +54,26 @@ class _FlipPromptState extends State<FlipPrompt>
         } else {
           turn = 1 - Curves.easeInOutCubic.transform((t - 0.8) / 0.2);
         }
+        // Rotation in radians (0 to 180 degrees). Past 90 degrees the card
+        // edge-on is passed, so we swap to the back face.
         final angle = turn * math.pi;
         final showBack = angle > math.pi / 2;
 
         return Transform(
           alignment: Alignment.center,
+          // setEntry(3, 2, ...) adds perspective so it looks 3D.
           transform: Matrix4.identity()
             ..setEntry(3, 2, 0.0014)
             ..rotateY(angle),
+          // Counter-rotate the back face by 180 degrees so it is not
+          // mirrored.
           child: Transform(
             alignment: Alignment.center,
             transform: Matrix4.identity()..rotateY(showBack ? math.pi : 0),
             child: AspectRatio(
+              // 1.8 : 1 is roughly the shape of a banknote.
               aspectRatio: 1.8,
+              // Glowing border: cyan on the front, violet on the back.
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
@@ -89,6 +103,8 @@ class _FlipPromptState extends State<FlipPrompt>
   }
 }
 
+/// Front side of the flip card: the captured photo with a green
+/// "FRONT ✓" tag.
 class _FrontFace extends StatelessWidget {
   const _FrontFace(this.image);
 
@@ -113,6 +129,8 @@ class _FrontFace extends StatelessWidget {
   }
 }
 
+/// Back side of the flip card: an empty violet placeholder with a flip
+/// icon and a "BACK ?" tag (the back is not captured yet).
 class _BackFace extends StatelessWidget {
   const _BackFace();
 
@@ -143,10 +161,13 @@ class _BackFace extends StatelessWidget {
   }
 }
 
+/// Small label placed in the corner of a card face.
 class _FaceTag extends StatelessWidget {
   const _FaceTag({required this.text, required this.color});
 
   final String text;
+
+  /// Colour of the text and border.
   final Color color;
 
   @override

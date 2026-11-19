@@ -1,7 +1,9 @@
-# === Large data / model files ===
+﻿# === Large data / model files ===
 monument_photos/
 mobilenetv3_pkr5000/
 *.tflite
+# ...except the models the current app needs at run time
+!fake_currency_detector/assets/models/*.tflite
 
 # === Build artifacts ===
 **/build/
@@ -62,3 +64,6 @@ local.properties
 # === Antigravity / Gemini agent files ===
 .agents/
 .gemini/
+
+# Downloaded training weights
+fake_currency_detector/yolo11s.pt
