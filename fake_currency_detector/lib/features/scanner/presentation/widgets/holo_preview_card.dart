@@ -7,6 +7,10 @@ import '../../domain/capture_models.dart';
 
 /// Captured side rendered as a holographic card with a moving sheen and a
 /// retake button.
+///
+/// Used on the review step of the capture screen, one card per side.
+/// It shows the side name, where the photo came from, the photo itself and
+/// a small refresh button to retake it.
 class HoloPreviewCard extends StatefulWidget {
   const HoloPreviewCard({
     super.key,
@@ -15,8 +19,13 @@ class HoloPreviewCard extends StatefulWidget {
     required this.onRetake,
   });
 
+  /// Front or back (decides the label and the cyan/violet accent).
   final NoteSide side;
+
+  /// The captured photo; null shows a "missing image" placeholder.
   final CapturedImage? image;
+
+  /// Called when the user taps the retake button.
   final VoidCallback onRetake;
 
   @override
@@ -25,6 +34,7 @@ class HoloPreviewCard extends StatefulWidget {
 
 class _HoloPreviewCardState extends State<HoloPreviewCard>
     with SingleTickerProviderStateMixin {
+  /// Drives the moving shine; one sweep every 3.2 seconds, repeating.
   late final AnimationController _sheen = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 3200),
@@ -45,6 +55,8 @@ class _HoloPreviewCardState extends State<HoloPreviewCard>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Header row: status dot (green = captured, amber = missing),
+        // side name, and on the right where the photo came from.
         Row(
           children: [
             Container(
@@ -83,6 +95,7 @@ class _HoloPreviewCardState extends State<HoloPreviewCard>
           ],
         ),
         const SizedBox(height: 8),
+        // Photo area, shaped like a banknote (1.8 : 1) with a glow.
         AspectRatio(
           aspectRatio: 1.8,
           child: Container(
@@ -111,7 +124,9 @@ class _HoloPreviewCardState extends State<HoloPreviewCard>
                     )
                   else
                     const _Missing(),
-                  // Holographic sheen.
+                  // Holographic sheen: a diagonal light band that slides
+                  // from left to right (x goes from -1.5 to 1.5, so it
+                  // starts and ends outside the card).
                   AnimatedBuilder(
                     animation: _sheen,
                     builder: (context, _) {
@@ -134,6 +149,7 @@ class _HoloPreviewCardState extends State<HoloPreviewCard>
                       );
                     },
                   ),
+                  // Retake button in the top-right corner.
                   Positioned(
                     right: 6,
                     top: 6,
@@ -162,6 +178,8 @@ class _HoloPreviewCardState extends State<HoloPreviewCard>
   }
 }
 
+/// Placeholder with an "image not available" icon, used when there is no
+/// photo or the file cannot be loaded.
 class _Missing extends StatelessWidget {
   const _Missing();
 

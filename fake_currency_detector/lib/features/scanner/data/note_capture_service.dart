@@ -1,3 +1,10 @@
+/// Gets a photo of one side of a banknote from the phone.
+///
+/// Three ways to get a photo: the ML Kit document scanner (best), the plain
+/// camera, or the gallery. Camera and gallery photos are cropped by hand.
+/// The controller (capture_controller.dart) calls this file.
+library;
+
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -9,16 +16,22 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/capture_models.dart';
 
+/// A finished photo: where the file is saved and how it was taken.
 class CaptureResult {
   const CaptureResult(this.path, this.source);
 
+  /// File path of the saved JPEG image.
   final String path;
+
+  /// Which method produced the photo (scanner, camera or gallery).
   final CaptureSource source;
 }
 
+/// Error thrown when capturing a photo fails; [message] is shown to the user.
 class CaptureFailure implements Exception {
   const CaptureFailure(this.message, {this.canUseBasicCamera = false});
 
+  /// Readable explanation of what went wrong.
   final String message;
 
   /// The ML Kit scanner could not start; the plain camera is an option.
@@ -35,19 +48,27 @@ class NoteCaptureService {
       : _picker = picker ?? ImagePicker(),
         _cropper = cropper ?? ImageCropper();
 
+  // Plugin that opens the camera or gallery.
   final ImagePicker _picker;
+  // Plugin that shows the manual crop screen.
   final ImageCropper _cropper;
 
   /// ML Kit's document scanner is Android-only (Google Play services).
   bool get supportsDocumentScanner =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
+  /// Scans one side of the note with the ML Kit document scanner.
+  /// Uses the plain camera instead on phones that do not support it.
   /// Returns `null` when the user cancels.
+  /// Throws [CaptureFailure] if the scanner cannot start.
   Future<CaptureResult?> scan(NoteSide side) async {
+    // Step 1: Phones without the scanner use the camera + manual crop.
     if (!supportsDocumentScanner) {
       return _cameraFallback(side);
     }
 
+    // Step 2: Set up the scanner: JPEG output, one page only, full mode
+    // (with editing tools) and no gallery import.
     final scanner = DocumentScanner(
       options: DocumentScannerOptions(
         documentFormats: const {DocumentFormat.jpeg},
@@ -57,11 +78,15 @@ class NoteCaptureService {
       ),
     );
     try {
+      // Step 3: Open the scanner screen and wait for the user.
       final result = await scanner.scanDocument();
       final images = result.images ?? const <String>[];
+      // No image means the user left without scanning.
       if (images.isEmpty) return null;
       return CaptureResult(_toFilePath(images.first), CaptureSource.documentScanner);
     } on PlatformException catch (e) {
+      // Step 4: A cancel is not an error. Anything else becomes a
+      // [CaptureFailure] with a helpful message.
       final msg = '${e.code} ${e.message}'.toLowerCase();
       if (msg.contains('cancel')) return null;
       // Never fall back silently: the plain camera has no edge detection,
@@ -75,11 +100,13 @@ class NoteCaptureService {
         canUseBasicCamera: true,
       );
     } finally {
+      // Always release the scanner, whether it worked or failed.
       await scanner.close();
     }
   }
 
-  /// Gallery upload with a manual crop locked to the banknote aspect ratio.
+  /// Lets the user choose a photo from the gallery, then crop it by hand.
+  /// Returns `null` if the user cancels either step.
   Future<CaptureResult?> pickFromGallery(NoteSide side) async {
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
@@ -93,6 +120,7 @@ class NoteCaptureService {
   /// Plain camera + manual free crop. No edge detection or auto-capture.
   Future<CaptureResult?> basicCamera(NoteSide side) => _cameraFallback(side);
 
+  /// Takes a photo with the rear camera, then lets the user crop it.
   Future<CaptureResult?> _cameraFallback(NoteSide side) async {
     final shot = await _picker.pickImage(
       source: ImageSource.camera,
@@ -109,6 +137,8 @@ class NoteCaptureService {
   /// frame makes the photo always fill it, which blocked zooming out (about
   /// 87%) on whole-photo uploads. The real shape of the crop is also what the
   /// half-note check needs to see.
+  /// Takes the image at [path] and returns the path of the cropped copy,
+  /// or `null` if the user cancels.
   Future<String?> _crop(String path, NoteSide side) async {
     final title = 'Crop ${side.label}: drag corners to the note edges';
     final file = await _cropper.cropImage(
@@ -146,10 +176,13 @@ class NoteCaptureService {
     return file?.path;
   }
 
+  /// Converts a `file:` address into a normal file path; plain paths are
+  /// returned unchanged.
   static String _toFilePath(String uriOrPath) {
     if (uriOrPath.startsWith('file:')) return Uri.parse(uriOrPath).toFilePath();
     return uriOrPath;
   }
 
+  /// True if a file exists at [path].
   static bool exists(String path) => File(path).existsSync();
 }

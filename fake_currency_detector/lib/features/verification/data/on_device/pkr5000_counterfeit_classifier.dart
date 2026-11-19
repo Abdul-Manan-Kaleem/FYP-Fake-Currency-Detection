@@ -1,3 +1,10 @@
+/// Rs 5,000 genuine vs counterfeit classifier (MobileNetV3-Large).
+///
+/// In: a 224x224 RGB tensor (a block of numbers) from the full-resolution
+/// photo. Out: probability (0-1) the note side is counterfeit. Model file:
+/// `assets/models/mobilenetv3_pkr5000_counterfeit.tflite`.
+library;
+
 import 'dart:typed_data';
 
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -16,15 +23,23 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 class Pkr5000CounterfeitClassifier {
   Pkr5000CounterfeitClassifier._(this._interpreter);
 
+  /// Path of the TFLite model file inside the app assets.
   static const String asset = 'assets/models/mobilenetv3_pkr5000_counterfeit.tflite';
+
+  /// Name shown in results.
   static const String modelName = 'MobileNetV3-Large · genuine/counterfeit · Rs 5,000 only';
 
   /// `class_to_idx` saved in the checkpoint: {'counterfeit': 0, 'genuine': 1}.
   static const List<String> classNames = ['counterfeit', 'genuine'];
+
+  /// Position of the "counterfeit" score in the 2-value output.
   static const int counterfeitIndex = 0;
 
+  /// The TFLite runtime object that actually runs the model.
   final Interpreter _interpreter;
 
+  /// Loads the model (4 CPU threads) and checks input is [1,224,224,3] and
+  /// output is [1,2]; throws a StateError otherwise.
   static Future<Pkr5000CounterfeitClassifier> load() async {
     final interpreter = await Interpreter.fromAsset(
       asset,
@@ -41,11 +56,13 @@ class Pkr5000CounterfeitClassifier {
 
   /// Probability that this side shows a counterfeit Rs 5,000 note.
   double counterfeitProbability(Float32List rgb224) {
+    // Two float32 outputs = 2 x 4 bytes; read the counterfeit one.
     final out = Uint8List(2 * 4);
     _interpreter.run(rgb224.buffer.asUint8List(), out);
     return ByteData.sublistView(out)
         .getFloat32(counterfeitIndex * 4, Endian.little);
   }
 
+  /// Frees the model's memory. Call when finished.
   void close() => _interpreter.close();
 }

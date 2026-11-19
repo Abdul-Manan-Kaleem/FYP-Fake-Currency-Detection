@@ -1,13 +1,21 @@
+/// The app-wide theme: fonts, colours and default styles for common widgets.
+///
+/// main.dart passes [AppTheme.dark] to MaterialApp, so every screen uses it.
+library;
+
 import 'package:flutter/material.dart';
 
 import '../utils/page_transitions.dart';
 import 'app_colors.dart';
 
+/// Holds the dark theme used by the whole app.
 abstract final class AppTheme {
   /// Monospace stack used for serial numbers and telemetry readouts.
   static const String mono = 'monospace';
 
+  /// The complete dark [ThemeData] for the app.
   static ThemeData get dark {
+    // Step 1: Start from a basic dark Material 3 theme with our colours.
     final base = ThemeData(
       brightness: Brightness.dark,
       useMaterial3: true,
@@ -22,7 +30,9 @@ abstract final class AppTheme {
       ),
     );
 
+    // Step 2: Add our own text styles and widget styles on top of the base.
     return base.copyWith(
+      // Text sizes and weights for headings, titles, body and small labels.
       textTheme: base.textTheme
           .apply(
             bodyColor: AppColors.textPrimary,
@@ -59,6 +69,7 @@ abstract final class AppTheme {
               color: AppColors.textSecondary,
             ),
           ),
+      // Top bar: see-through, no shadow, centred title.
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -72,6 +83,7 @@ abstract final class AppTheme {
           color: AppColors.textPrimary,
         ),
       ),
+      // Small pop-up messages at the bottom of the screen.
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.surfaceHigh,
@@ -81,10 +93,12 @@ abstract final class AppTheme {
           side: const BorderSide(color: AppColors.glassBorder),
         ),
       ),
+      // Bottom sheets are see-through so our own glass panels show.
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
       ),
+      // On/off switches: cyan when on, grey when off.
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
           (s) => s.contains(WidgetState.selected)
@@ -97,6 +111,7 @@ abstract final class AppTheme {
               : AppColors.surfaceHigh,
         ),
       ),
+      // Text input boxes: faint glass fill, cyan border when focused.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.glassFill,
@@ -113,6 +128,7 @@ abstract final class AppTheme {
           borderSide: const BorderSide(color: AppColors.cyan),
         ),
       ),
+      // Use our custom page animation on Android and iOS.
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CyberPageTransitionsBuilder(),

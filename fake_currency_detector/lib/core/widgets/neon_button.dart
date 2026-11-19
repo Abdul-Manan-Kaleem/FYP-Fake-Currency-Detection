@@ -1,3 +1,8 @@
+/// The two button styles used in the app: [NeonButton] and [GhostButton].
+///
+/// Both give a small vibration (haptic tap) when pressed.
+library;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -15,23 +20,37 @@ class NeonButton extends StatefulWidget {
     this.expanded = true,
   });
 
+  /// Text shown on the button.
   final String label;
+
+  /// Called when tapped. If null, the button is disabled and greyed out.
   final VoidCallback? onPressed;
+
+  /// Optional icon shown before the label.
   final IconData? icon;
+
+  /// Main colour of the button.
   final Color color;
+
+  /// Whether the glow slowly pulses.
   final bool pulse;
+
+  /// True = button fills the full width; false = only as wide as needed.
   final bool expanded;
 
   @override
   State<NeonButton> createState() => _NeonButtonState();
 }
 
+/// Holds the glow animation and the "is pressed" flag for [NeonButton].
 class _NeonButtonState extends State<NeonButton>
     with SingleTickerProviderStateMixin {
+  // Glow animation: 0 to 1 and back, each trip taking 1.6 seconds.
   late final AnimationController _glow = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1600),
   );
+  // True while the finger is down; makes the button shrink slightly.
   bool _pressed = false;
 
   @override
@@ -40,6 +59,7 @@ class _NeonButtonState extends State<NeonButton>
     if (widget.pulse) _glow.repeat(reverse: true);
   }
 
+  // Free the animation resources when the widget is removed.
   @override
   void dispose() {
     _glow.dispose();
@@ -48,13 +68,18 @@ class _NeonButtonState extends State<NeonButton>
 
   @override
   Widget build(BuildContext context) {
+    // A button with no onPressed is disabled and uses a muted colour.
     final enabled = widget.onPressed != null;
     final color = enabled ? widget.color : AppColors.textMuted;
 
+    // The outer glow is rebuilt on every animation tick; the button itself
+    // (the `child` below) is built only once.
     return AnimatedBuilder(
       animation: _glow,
       builder: (context, child) {
+        // Glow strength (0 to 1); fixed at 0.5 when not pulsing.
         final t = widget.pulse && enabled ? _glow.value : 0.5;
+        // Shrink to 97% while pressed.
         return AnimatedScale(
           scale: _pressed ? 0.97 : 1,
           duration: const Duration(milliseconds: 120),
@@ -80,6 +105,7 @@ class _NeonButtonState extends State<NeonButton>
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
+          // Track finger down/up to drive the press-shrink effect.
           onHighlightChanged: (v) => setState(() => _pressed = v),
           onTap: enabled
               ? () {
@@ -138,9 +164,16 @@ class GhostButton extends StatelessWidget {
     this.color = AppColors.textPrimary,
   });
 
+  /// Text shown on the button.
   final String label;
+
+  /// Called when tapped. If null, the button is disabled.
   final VoidCallback? onPressed;
+
+  /// Optional icon shown before the label.
   final IconData? icon;
+
+  /// Colour of the text, icon and border.
   final Color color;
 
   @override
