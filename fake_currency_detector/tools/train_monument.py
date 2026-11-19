@@ -465,8 +465,13 @@ def cross_validate(sorted_dir, folds, epochs, seed, min_per_class, report_path):
             for path in groups[key]:
                 fold_of[path] = k_i % folds
 
-    results = []
+    # Folds finished earlier are kept in <report>.partial, so a stopped run resumes.
+    partial = report_path + '.partial'
+    results = json.load(open(partial, encoding='utf8')) if os.path.exists(partial) else []
     for k in range(folds):
+        if any(r['fold'] == k + 1 for r in results):
+            print(f'Fold {k + 1}/{folds}: already done, skipped')
+            continue
         tr = [(p, y) for p, y in items if fold_of[p] != k]
         te = [(p, y) for p, y in items if fold_of[p] == k]
         print(f'\n===== Fold {k + 1}/{folds}: {len(tr)} training photos, {len(te)} test photos =====')
@@ -486,6 +491,7 @@ def cross_validate(sorted_dir, folds, epochs, seed, min_per_class, report_path):
             print(f'  {c:15s} {r["accuracy"]}  ({r["test_photos"]} photos)')
         results.append({'fold': k + 1, 'train_photos': len(tr), 'test_photos': len(te),
                         'accuracy': overall, 'per_class': per_class})
+        json.dump(results, open(partial, 'w', encoding='utf8'))
         tf.keras.backend.clear_session()
 
     accs = np.array([r['accuracy'] for r in results])
