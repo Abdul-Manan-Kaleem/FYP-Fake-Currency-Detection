@@ -102,9 +102,14 @@ def main():
     folds = cc.make_folds(groups, primary, a.folds)
 
     from ultralytics import YOLO
-    results = []
+    import json
+    # folds finished earlier are read back from the report, so a stopped run resumes
+    results = json.load(open(a.out, encoding='utf8'))['folds'] if os.path.exists(a.out) else []
     for k, (tr, te) in enumerate(folds, 1):
         if a.only_fold and k != a.only_fold:
+            continue
+        if any(r['fold'] == k for r in results):
+            print(f'Fold {k}: already done, skipped', flush=True)
             continue
         rng = np.random.RandomState(cc.SEED + k)
         tr_use = rng.permutation(tr)[:a.max_train] if a.max_train else tr

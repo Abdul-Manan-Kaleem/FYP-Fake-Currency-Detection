@@ -46,6 +46,24 @@ Taken from the training notebooks in this repository (test sets of each model):
 
 These are model scores on their own test sets, not the accuracy of the whole app on real notes.
 
+## 10-fold cross-validation
+
+How well each model works on photos it has not seen is measured with 10-fold cross-validation (ten fresh
+models, each tested on the tenth of the photos it did not train on). Folds are stratified, grouped by
+photo burst (same minute), de-duplicated (one copy per Roboflow source photo) and use seed 7.
+Nothing is installed into the app.
+
+| Test | Model | Script |
+|---|---|---|
+| Monument classifier (note back) | MobileNetV2 | `tools/train_monument.py --folds 10` |
+| Rs 5,000 genuine vs altered (patch level) | MobileNetV3-Large | `tools/cv/cv_rs5000.py` |
+| Note denomination detector | YOLO11s | `tools/cv/cv_yolo.py` |
+
+Details, commands and limits are in [`fake_currency_detector/tools/cv/README.md`](fake_currency_detector/tools/cv/README.md).
+A draft report is in `fake_currency_detector/docs/cv_report/`; the final numbers are produced by
+`tools/cv/build_final_report.py` once all three tests have finished. MobileNetV3-Small is not part of this
+run (its Genuine/Fake training photos are not available).
+
 ## Repository layout
 
 ```
@@ -54,6 +72,8 @@ fake_currency_detector/   Flutter app (current)
   assets/models/          The TensorFlow Lite models bundled in the APK
   test/                   Automated tests (176 test cases)
   tools/                  Training and parity helper scripts
+  tools/cv/               10-fold cross-validation scripts and report builder
+  docs/cv_report/         10-fold cross-validation report (draft, Word + PDF)
 notebooks/                Earlier training notebooks
 model/                    Earlier exported model files
 monument_model_out/       Monument classifier labels and info

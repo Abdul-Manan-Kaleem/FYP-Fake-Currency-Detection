@@ -64,3 +64,6 @@ local.properties
 # === Antigravity / Gemini agent files ===
 .agents/
 .gemini/
+
+# Downloaded training weights
+fake_currency_detector/yolo11s.pt
