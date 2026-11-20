@@ -18,7 +18,8 @@ live in `app/` was removed; its history is still in git.)
 
 How a note is checked:
 
-1. **Capture** both sides with the ML Kit document scanner (or gallery, or basic camera). After each
+1. **Capture** both sides with the ML Kit document scanner in base mode (crop and rotate only, no
+   filters or auto enhance, so the photo is checked as it is), or gallery, or basic camera. After each
    photo the app checks it is a banknote and that it is the right side.
 2. **Detect** the denomination and six features (printed year, SBP seal, security dots, security lines,
    security thread, serial number) with **YOLO11s**.
@@ -27,9 +28,20 @@ How a note is checked:
    MobileNetV3-Small model for Rs10 to Rs1,000 is built in but switched off for now
    (`kSmallCnnEnabled` in `currency_rules.dart`).
 5. **Check the monument** printed on the back against the denomination.
-6. **Decide** with a rule engine that returns one of: PASSED APP CHECKS, SUSPICIOUS, UNABLE TO VERIFY,
-   FAKE (only for a clear monument mismatch), INCOMPLETE, or NOT A BANKNOTE. A poor photo or a missed
-   detection is never reported as a counterfeit.
+6. **Decide** with a rule engine. The verdict is only **REAL** or **FAKE**: any failed feature makes the
+   note FAKE. UNABLE TO VERIFY, INCOMPLETE and NOT A BANKNOTE are shown only when the photos cannot be
+   judged (a poor photo or a missed detection is never reported as a counterfeit). The result screen
+   shows the verdict first, then the security-features list, then the scanned images.
+
+Strict rules in the engine:
+
+- **Dots / lines** (counted separately, on the original image): the note must show exactly Rs 10 none,
+  Rs 20 one line, Rs 50 two lines, Rs 100 three lines, Rs 500 one dot, Rs 1,000 two dots, Rs 5,000
+  three dots. Fewer or more, or the wrong mark type, fails the feature and the note is FAKE even if
+  every other feature passes.
+- **Serial number**: it must look random. Repeated digits (000000000, 111111111) or a pattern
+  (1234567890, 9876543210, alternating digits) are FAKE.
+- All messages are in English.
 
 Everything runs on the phone through TensorFlow Lite.
 
@@ -103,6 +115,13 @@ Android Studio, open the `fake_currency_detector` folder.
 
 `.github/workflows/build_apk.yml` builds a release APK on GitHub Actions for pushes to `main` (or by hand
 from the Actions tab) and uploads it as an artifact.
+
+`.github/workflows/build_ios.yml` builds the iPhone version on a GitHub macOS machine (iOS cannot be built
+on Windows) for pushes to `improvements` or by hand, and uploads an **unsigned** `.ipa` as the
+`ios-unsigned-ipa` artifact. Install it on an iPhone with AltStore or Sideloadly using your own Apple ID
+(a free Apple ID lasts 7 days), or sign it with an Apple Developer account. The Android document scanner is
+not available on iPhone; the app uses the normal camera there. The iPhone build has not been tested on a
+device.
 
 ## Team
 
