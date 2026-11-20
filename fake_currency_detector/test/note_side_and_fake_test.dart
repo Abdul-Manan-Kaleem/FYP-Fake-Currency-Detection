@@ -121,7 +121,7 @@ void main() {
         sbpSeals: FeatureDetectionModel(count: 1, confidence: 0.9),
         securityThreads: FeatureDetectionModel(count: 1, confidence: 0.9),
         securityLines: FeatureDetectionModel(count: 0, confidence: 1),
-        securityDots: FeatureDetectionModel(count: 1, confidence: 0.9),
+        securityDots: FeatureDetectionModel(count: 3, confidence: 0.9),
         printedYear: PrintedYearModel(detected: true, value: '2022', confidence: 0.9),
         serialNumbers: [
           SerialReadModel(text: 'AK4718263', confidence: 0.9),
@@ -147,3 +147,4 @@ void main() {
     expect(r.messages.join(' '), contains('Microprint could not be read'));
   });
 }
+

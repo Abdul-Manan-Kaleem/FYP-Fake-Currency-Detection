@@ -837,28 +837,29 @@ class VerificationEngine {
 
     final CheckStatus status;
     final String summary;
-    // Order of rules: wrong mark type present -> fail; none of the right
-    // type -> fail (or unclear if only faint); too many boxes -> fail;
-    // otherwise pass.
-    if (other.count > 0) {
+    // STRICT RULE: the note must show EXACTLY the required number of its own
+    // mark (Rs 20: 1 line, Rs 50: 2, Rs 100: 3, Rs 500: 1 dot, Rs 1,000: 2,
+    // Rs 5,000: 3) and none of the other type. Fewer or more is a FAIL, which
+    // makes the whole note FAKE even when every other feature passes.
+    // The only exception is a mark seen so faintly that nothing was counted:
+    // that is "unclear" (retake), not a fail.
+    final seen = mine.observedMarks;
+    if (other.observedMarks > 0) {
       status = CheckStatus.fail;
       summary = 'Security $otherKind found, but $rs uses ${plural(n, kind)}';
-    } else if (mine.count == 0) {
+    } else if (seen == 0) {
       status = mine.uncertainCount > 0
           ? CheckStatus.inconclusive
           : CheckStatus.fail;
       summary = status == CheckStatus.inconclusive
           ? 'Security ${kind}s only faintly detected · retake in better light'
-          : 'No security ${kind}s found ($rs has $n)';
-    } else if (mine.count > n) {
+          : 'No security ${kind}s found ($rs needs $n)';
+    } else if (seen != n) {
       status = CheckStatus.fail;
-      summary = '${mine.count} $kind regions found ($rs has $n)';
+      summary = '$seen ${plural(seen, kind)} found, $rs needs exactly $n';
     } else {
       status = CheckStatus.pass;
-      final counted = mine.markCount;
-      summary = counted == n
-          ? 'Security ${plural(n, kind)}: $n of $n counted'
-          : 'Security ${plural(n, kind)} region found ($rs has $n)';
+      summary = 'Security ${plural(n, kind)}: $n of $n counted';
     }
 
     return _check(
@@ -877,18 +878,16 @@ class VerificationEngine {
           label: 'Security $kind regions (YOLO)',
           value: '${mine.count}${_uncertain(mine)}'
               '${mine.count > 0 ? ' · ${_pct(mine.confidence)}' : ''}',
-          ok: mine.count >= 1 && mine.count <= n,
         ),
-        if (mine.markCount != null)
-          CheckDetailModel(
-            label: '${kind[0].toUpperCase()}${kind.substring(1)}s counted in region',
-            value: '${mine.markCount} of $n',
-            ok: mine.markCount == n ? true : null,
-          ),
+        CheckDetailModel(
+          label: '${kind[0].toUpperCase()}${kind.substring(1)}s counted',
+          value: '$seen of $n required',
+          ok: seen == n,
+        ),
         CheckDetailModel(
           label: 'Security $otherKind (must be absent)',
           value: '${other.count}${_uncertain(other)}',
-          ok: other.count == 0,
+          ok: other.observedMarks == 0,
         ),
       ],
     );

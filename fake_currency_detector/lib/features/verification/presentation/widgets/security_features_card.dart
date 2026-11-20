@@ -46,24 +46,24 @@ class SecurityFeaturesCard extends StatelessWidget {
       return _Row(name, CheckStatus.inconclusive, 'Note value not confirmed');
     }
     final expected = spec.mark == kind ? spec.markCount : 0;
+    final seen = found.observedMarks;
     if (expected == 0) {
-      return found.count > 0
+      return seen > 0
           ? _Row(name, CheckStatus.fail,
               'Found, but this note should not have $word')
           : _Row(name, CheckStatus.notApplicable, 'Not on this note');
     }
-    if (found.count == 0) {
+    if (seen == 0) {
       return found.uncertainCount > 0
           ? _Row(name, CheckStatus.inconclusive,
               'Only faintly seen · expected $expected')
           : _Row(name, CheckStatus.fail, 'MISSING · expected $expected');
     }
-    if (found.count > expected) {
-      return _Row(name, CheckStatus.fail,
-          '${found.count} regions found · expected $expected');
+    // Strict rule: exactly the required number, no more and no fewer.
+    if (seen != expected) {
+      return _Row(name, CheckStatus.fail, '$seen found · required $expected');
     }
-    final counted = found.markCount ?? found.count;
-    return _Row(name, CheckStatus.pass, 'Found · $counted of $expected');
+    return _Row(name, CheckStatus.pass, 'Found · $seen of $expected');
   }
 
   /// Row built from one of the engine's checks (its status and summary).

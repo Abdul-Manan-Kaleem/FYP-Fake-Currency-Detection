@@ -523,12 +523,8 @@ abstract final class ImagePreprocessor {
     final b = (box.bottom + my).clamp(y + 1, image.height).toInt();
     var crop = img.grayscale(
         img.copyCrop(image, x: x, y: y, width: r - x, height: b - y));
-    // Step 2: enlarge very small crops so the short side is at least 48 px.
-    if (math.min(crop.width, crop.height) < 48) {
-      final s = 48 / math.min(crop.width, crop.height);
-      crop = img.copyResize(crop,
-          width: (crop.width * s).round(), height: (crop.height * s).round());
-    }
+    // Step 2: no enhancement of any kind (no resizing, contrast stretch or
+    // sharpening): the marks are counted on the original pixels as they are.
     final w = crop.width, h = crop.height, total = w * h;
     final lum = Uint8List(total);
     final hist = List<int>.filled(256, 0);

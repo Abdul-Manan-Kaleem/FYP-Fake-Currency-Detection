@@ -25,7 +25,7 @@ void main() {
           denominationConfidence: 0.95,
           sbpSeals: FeatureDetectionModel(count: 1, confidence: 0.9),
           securityThreads: FeatureDetectionModel(count: 1, confidence: 0.9),
-          securityLines: FeatureDetectionModel(count: 1, confidence: 0.9),
+          securityLines: FeatureDetectionModel(count: 3, confidence: 0.9),
           securityDots: FeatureDetectionModel(count: 0, confidence: 1),
           printedYear: PrintedYearModel(detected: true, value: '2022', confidence: 0.9),
           serialNumbers: [
@@ -190,3 +190,4 @@ void main() {
     expect(q8.length, 224 * 224 * 3);
   });
 }
+

@@ -83,6 +83,12 @@ class FeatureDetectionModel {
   /// best YOLO box (YOLO labels a whole group as one box). Informational.
   final int? markCount;
 
+  /// Number of individual lines/dots actually seen: separate YOLO boxes, or
+  /// the marks counted inside one box, whichever is larger. This is the number
+  /// the strict dots/lines rule compares with the required count.
+  int get observedMarks =>
+      markCount != null && markCount! > count ? markCount! : count;
+
   /// Lowest confidence among the detections that make up [count]
   /// (or the classifier's confidence that there are none).
   final double confidence;

@@ -65,7 +65,7 @@ void main() {
             sbpSeals: const FeatureDetectionModel(count: 1, confidence: 0.9),
             securityThreads: const FeatureDetectionModel(count: 1, confidence: 0.9),
             securityLines: const FeatureDetectionModel(count: 0, confidence: 1),
-            securityDots: const FeatureDetectionModel(count: 1, confidence: 0.9),
+            securityDots: const FeatureDetectionModel(count: 3, confidence: 0.9),
             printedYear:
                 const PrintedYearModel(detected: true, value: '2022', confidence: 0.9),
             serialNumbers: const [
@@ -137,3 +137,4 @@ void main() {
     expect(left.width, greaterThan(left.height)); // rotated to run horizontally
   });
 }
+

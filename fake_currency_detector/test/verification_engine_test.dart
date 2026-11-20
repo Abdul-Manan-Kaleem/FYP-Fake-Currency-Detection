@@ -174,10 +174,85 @@ void main() {
       });
     }
 
-    // YOLO boxes a whole group of marks as one region, so region count is
-    // 1..marks; only the mark TYPE and absurd region counts can fail.
-    test('one grouped line region on Rs 100 passes', () {
-      expect(eval(front(lines: 1), back()).verdict, VerificationVerdict.real);
+    // STRICT dots/lines rule: exactly the required number of marks.
+    // Rs 10: none; Rs 20: 1 line; Rs 50: 2 lines; Rs 100: 3 lines;
+    // Rs 500: 1 dot; Rs 1,000: 2 dots; Rs 5,000: 3 dots.
+    FeatureCheckModel markCheck(VerificationResultModel r) =>
+        r.checks.firstWhere((c) => c.id == FeatureCheckId.linesDots);
+
+    for (final (denom, lines, dots, thread) in [
+      (10, 0, 0, 0),
+      (20, 1, 0, 0),
+      (50, 2, 0, 0),
+      (100, 3, 0, 1),
+      (500, 0, 1, 1),
+      (1000, 0, 2, 1),
+      (5000, 0, 3, 1),
+    ]) {
+      test('Rs $denom with exactly the required marks passes', () {
+        final r = eval(
+            front(denom: denom, lines: lines, dots: dots, threads: thread),
+            back(denom: denom));
+        expect(markCheck(r).status, CheckStatus.pass);
+        expect(r.verdict, VerificationVerdict.real);
+      });
+    }
+
+    test('Rs 5000 with 2 dots instead of 3 is FAKE even if all else passes', () {
+      final r = eval(front(denom: 5000, lines: 0, dots: 2), back(denom: 5000));
+      expect(markCheck(r).status, CheckStatus.fail);
+      expect(r.verdict, VerificationVerdict.fake);
+    });
+
+    test('Rs 100 with 2 lines instead of 3 is FAKE', () {
+      final r = eval(front(lines: 2), back());
+      expect(markCheck(r).status, CheckStatus.fail);
+      expect(r.verdict, VerificationVerdict.fake);
+    });
+
+    test('Rs 1000 with 3 dots instead of 2 is FAKE', () {
+      final r = eval(front(denom: 1000, lines: 0, dots: 3), back(denom: 1000));
+      expect(markCheck(r).status, CheckStatus.fail);
+      expect(r.verdict, VerificationVerdict.fake);
+    });
+
+    test('Rs 20 with 2 lines instead of 1 is FAKE', () {
+      final r = eval(front(denom: 20, lines: 2, threads: 0), back(denom: 20));
+      expect(r.verdict, VerificationVerdict.fake);
+    });
+
+    test('Rs 10 with a line or a dot is FAKE', () {
+      expect(eval(front(denom: 10, lines: 1, threads: 0), back(denom: 10)).verdict,
+          VerificationVerdict.fake);
+      expect(eval(front(denom: 10, lines: 0, dots: 1, threads: 0), back(denom: 10)).verdict,
+          VerificationVerdict.fake);
+    });
+
+    test('one grouped region is counted by its marks: 3 dots in one box pass', () {
+      final r = engine.evaluate(NoteAnalysisModel(
+        isBanknote: true,
+        banknoteConfidence: 0.95,
+        front: SideDetectionModel(
+          quality: const ImageQualityModel(
+              blurScore: 0.1, glareScore: 0.1, brightness: 0.5),
+          denomination: 5000,
+          denominationConfidence: 0.95,
+          sbpSeals: const FeatureDetectionModel(count: 1, confidence: 0.95),
+          securityThreads: const FeatureDetectionModel(count: 1, confidence: 0.95),
+          securityLines: const FeatureDetectionModel(count: 0, confidence: 1),
+          securityDots:
+              const FeatureDetectionModel(count: 1, confidence: 0.9, markCount: 3),
+          printedYear:
+              const PrintedYearModel(detected: true, value: '2020', confidence: 0.95),
+          serialNumbers: const [
+            SerialReadModel(text: 'AB4718263', confidence: 0.95),
+            SerialReadModel(text: 'AB4718263', confidence: 0.95),
+          ],
+        ),
+        back: back(denom: 5000),
+        rs5000OnlyReason: 'Only for Rs 5,000 notes',
+      ));
+      expect(markCheck(r).status, CheckStatus.pass);
     });
 
     test('more line regions than lines is fake', () {
@@ -196,18 +271,17 @@ void main() {
       expect(r.verdict, VerificationVerdict.fake);
     });
 
-    // Screenshot case: Rs 1,000 with both dots inside ONE dots box.
-    test('Rs 1000 with a single dots region passes the mark check', () {
+    test('Rs 1000 with a single dots region and no count is FAKE (needs 2)', () {
       final r = eval(
         front(denom: 1000, lines: 0, dots: 1),
         back(denom: 1000),
       );
       final mark = r.checks.firstWhere((c) => c.id == FeatureCheckId.linesDots);
-      expect(mark.status, CheckStatus.pass);
+      expect(mark.status, CheckStatus.fail);
     });
 
     // Rs 10, 20 and 50 have no security thread.
-    for (final (denom, lines) in [(10, 0), (20, 1), (50, 1)]) {
+    for (final (denom, lines) in [(10, 0), (20, 1), (50, 2)]) {
       test('Rs $denom: thread is not applicable', () {
         final r = eval(
           front(denom: denom, lines: lines, threads: 0),
@@ -539,7 +613,7 @@ void main() {
             sbpSeals: FeatureDetectionModel(count: 1, confidence: 0.9),
             securityThreads: FeatureDetectionModel(count: 1, confidence: 0.9),
             securityLines: FeatureDetectionModel(count: 0, confidence: 1),
-            securityDots: FeatureDetectionModel(count: 1, confidence: 0.9),
+            securityDots: FeatureDetectionModel(count: 3, confidence: 0.9),
             printedYear:
                 PrintedYearModel(detected: true, value: '2022', confidence: 0.9),
             serialNumbers: [
@@ -597,3 +671,4 @@ void main() {
     });
   });
 }
+

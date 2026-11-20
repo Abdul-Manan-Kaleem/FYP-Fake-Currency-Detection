@@ -67,12 +67,13 @@ class NoteCaptureService {
       return _cameraFallback(side);
     }
 
-    // Step 2: Set up the scanner: JPEG output, one page only, full mode
-    // (with editing tools) and no gallery import.
+    // Step 2: Set up the scanner: JPEG output, one page only, base mode
+    // (crop and rotate only: no filters, no auto enhance, so the image stays
+    // exactly as the camera saw it) and no gallery import.
     final scanner = DocumentScanner(
       options: DocumentScannerOptions(
         documentFormats: const {DocumentFormat.jpeg},
-        mode: ScannerMode.full,
+        mode: ScannerMode.base,
         pageLimit: 1,
         isGalleryImport: false,
       ),
