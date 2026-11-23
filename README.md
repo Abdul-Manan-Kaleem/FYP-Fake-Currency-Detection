@@ -19,8 +19,11 @@ live in `app/` was removed; its history is still in git.)
 How a note is checked:
 
 1. **Capture** both sides with the ML Kit document scanner in base mode (crop and rotate only, no
-   filters or auto enhance, so the photo is checked as it is), or gallery, or basic camera. After each
-   photo the app checks it is a banknote and that it is the right side.
+   automatic filters), or gallery, or basic camera. After each photo the app checks it is a banknote and
+   that it is the right side. Photos are **never enhanced automatically**: the original photo is checked
+   by default. On the review screen an **Enhance photos** switch (OFF by default) lets the user turn
+   enhancement ON or OFF at any time; ON checks enhanced copies, OFF goes back to the originals (the
+   original files are never changed).
 2. **Detect** the denomination and six features (printed year, SBP seal, security dots, security lines,
    security thread, serial number) with **YOLO11s**.
 3. **Read** the two serial numbers and the printed year with ML Kit text recognition.

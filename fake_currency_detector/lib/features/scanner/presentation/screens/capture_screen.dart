@@ -28,7 +28,10 @@ class CaptureScreen extends ConsumerWidget {
   /// The back can be null when the user chose "Analyze front only".
   void _analyze(BuildContext context, CaptureState s) {
     Navigator.of(context).push(
-      CyberRoute(builder: (_) => AnalyzingScreen(front: s.front, back: s.back)),
+      // The original photos are checked unless the user turned Enhance ON.
+      CyberRoute(
+          builder: (_) =>
+              AnalyzingScreen(front: s.frontToUse, back: s.backToUse)),
     );
   }
 
@@ -105,6 +108,7 @@ class CaptureScreen extends ConsumerWidget {
           state: state,
           onRetake: (side) => _showRetakeSheet(context, ref, side),
           onAnalyze: () => _analyze(context, state),
+          onEnhance: controller.setEnhance,
         ),
     };
 
@@ -448,11 +452,15 @@ class _ReviewStepView extends StatelessWidget {
     required this.state,
     required this.onRetake,
     required this.onAnalyze,
+    required this.onEnhance,
   });
 
   final CaptureState state;
   final ValueChanged<NoteSide> onRetake;
   final VoidCallback onAnalyze;
+
+  /// Called when the user flips the manual Enhance switch.
+  final ValueChanged<bool> onEnhance;
 
   /// Names of the checks shown as chips under "PIPELINE". Display only;
   /// the real checks run later on the analyzing screen.
@@ -488,7 +496,7 @@ class _ReviewStepView extends StatelessWidget {
                     Expanded(
                       child: HoloPreviewCard(
                         side: NoteSide.front,
-                        image: state.front,
+                        image: state.frontToUse,
                         onRetake: () => onRetake(NoteSide.front),
                       ),
                     ),
@@ -496,11 +504,29 @@ class _ReviewStepView extends StatelessWidget {
                     Expanded(
                       child: HoloPreviewCard(
                         side: NoteSide.back,
-                        image: state.back,
+                        image: state.backToUse,
                         onRetake: () => onRetake(NoteSide.back),
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                // Manual Enhance switch. OFF (default) = the original photos
+                // are checked; ON = the enhanced copies are checked.
+                GlassContainer(
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Enhance photos'),
+                    subtitle: Text(
+                      state.enhance
+                          ? 'ON: the enhanced photos are checked'
+                          : 'OFF: the original photos are checked',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    value: state.enhance,
+                    onChanged: state.isComplete && !state.busy ? onEnhance : null,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 // Card listing the checks that will run.

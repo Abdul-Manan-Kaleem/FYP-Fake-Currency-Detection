@@ -33,10 +33,40 @@ class CapturedImage {
     required this.source,
     required this.capturedAt,
     this.denomination,
+    this.enhancedPath,
   });
 
-  /// File path of the image.
+  /// File path of the ORIGINAL image (never changed by the app).
   final String path;
+
+  /// Enhanced copy made only after the user turned Enhance ON, else null.
+  final String? enhancedPath;
+
+  /// Returns this photo with the enhanced copy attached.
+  CapturedImage withEnhanced(String enhanced) => CapturedImage(
+        path: path,
+        side: side,
+        source: source,
+        capturedAt: capturedAt,
+        denomination: denomination,
+        enhancedPath: enhanced,
+      );
+
+  /// The photo to show and analyse: the enhanced copy when [enhance] is ON and
+  /// the copy exists, otherwise the original. The returned photo points at the
+  /// chosen file in [path].
+  CapturedImage chosen(bool enhance) {
+    final e = enhancedPath;
+    if (!enhance || e == null) return this;
+    return CapturedImage(
+      path: e,
+      side: side,
+      source: source,
+      capturedAt: capturedAt,
+      denomination: denomination,
+      enhancedPath: e,
+    );
+  }
 
   /// Which side of the note this photo shows.
   final NoteSide side;
@@ -69,7 +99,19 @@ class CaptureState {
     this.basicCameraSide,
     this.busyMessage,
     this.sideError,
+    this.enhance = false,
   });
+
+  /// Manual Enhance switch. OFF by default: the original photos are shown and
+  /// checked. ON: the enhanced copies are shown and checked.
+  final bool enhance;
+
+  /// The front photo as it will be shown and analysed (original unless
+  /// Enhance is ON).
+  CapturedImage? get frontToUse => front?.chosen(enhance);
+
+  /// The back photo as it will be shown and analysed.
+  CapturedImage? get backToUse => back?.chosen(enhance);
 
   /// Accepted photo of the front, or null if not taken yet.
   final CapturedImage? front;
@@ -116,10 +158,12 @@ class CaptureState {
     NoteSide? basicCameraSide,
     String? busyMessage,
     SideError? sideError,
+    bool? enhance,
     bool clearError = false,
     bool clearBusyMessage = false,
   }) {
     return CaptureState(
+      enhance: enhance ?? this.enhance,
       front: front ?? this.front,
       back: back ?? this.back,
       step: step ?? this.step,

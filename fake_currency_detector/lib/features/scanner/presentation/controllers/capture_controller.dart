@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/haptics.dart';
 import '../../data/note_capture_service.dart';
+import '../../data/photo_enhancer.dart';
 import '../../../verification/domain/side_classifier.dart';
 import '../../../verification/presentation/controllers/verification_controller.dart';
 import '../../domain/capture_models.dart';
@@ -150,7 +151,12 @@ class CaptureController extends Notifier<CaptureState> {
   /// An older photo of the same side is forgotten first.
   void _store(NoteSide side, CaptureResult result, [int? denomination]) {
     final replaced = side == NoteSide.front ? state.front : state.back;
-    if (replaced != null) _forget([replaced.path]);
+    if (replaced != null) {
+      _forget([replaced.path, ?replaced.enhancedPath]);
+    }
+    // A newly taken photo is always the original; Enhance goes back to OFF
+    // so the new photo is checked as it is until the user turns it on again.
+    state = state.copyWith(enhance: false);
     final image = CapturedImage(
       path: result.path,
       side: side,
@@ -182,6 +188,43 @@ class CaptureController extends Notifier<CaptureState> {
     }
   }
 
+  /// Manual Enhance switch (review step). OFF = original photos (the
+  /// default). ON = enhanced copies, made now from the originals; the
+  /// originals are never changed, so switching OFF restores them.
+  Future<void> setEnhance(bool on) async {
+    if (state.busy) return;
+    if (!on) {
+      state = state.copyWith(enhance: false);
+      return;
+    }
+    state = state.copyWith(busy: true, busyMessage: 'Enhancing…');
+    try {
+      var front = state.front;
+      var back = state.back;
+      if (front != null && front.enhancedPath == null) {
+        front = front.withEnhanced(await PhotoEnhancer.enhance(front.path));
+      }
+      if (back != null && back.enhancedPath == null) {
+        back = back.withEnhanced(await PhotoEnhancer.enhance(back.path));
+      }
+      state = state.copyWith(
+        front: front,
+        back: back,
+        enhance: true,
+        busy: false,
+        clearBusyMessage: true,
+      );
+    } on Object catch (e) {
+      debugPrint('Enhance failed: $e');
+      state = state.copyWith(
+        enhance: false,
+        busy: false,
+        clearBusyMessage: true,
+        error: 'Could not enhance the photo. The original is used.',
+      );
+    }
+  }
+
   /// User says the note is flipped: move to the BACK step.
   void confirmFlip() => state = state.copyWith(step: CaptureStep.back);
 
@@ -193,7 +236,12 @@ class CaptureController extends Notifier<CaptureState> {
 
   /// Wipes everything and returns to the FRONT capture view.
   void reset() {
-    _forget([?state.front?.path, ?state.back?.path]);
+    _forget([
+      ?state.front?.path,
+      ?state.front?.enhancedPath,
+      ?state.back?.path,
+      ?state.back?.enhancedPath,
+    ]);
     state = const CaptureState();
   }
 }
