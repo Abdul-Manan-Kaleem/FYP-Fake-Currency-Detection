@@ -198,11 +198,9 @@ class SideError {
   /// The photograph is not a banknote: shown right after the first photo, so
   /// the user is never asked for the back of something that is not a note.
   static const notABanknote = SideError(
-    title: 'INVALID IMAGE · NOT A NOTE',
+    title: 'INVALID IMAGE',
     notBanknote: true,
-    english: 'This is not an image of a Pakistani banknote, so it was not '
-        'accepted. Place the whole note flat on a plain surface in good light '
-        'and scan it again.',
+    english: 'The uploaded image is not of Pakistani currency.',
   );
 
   /// The user scanned the back when the front was expected.

@@ -114,7 +114,7 @@ class VerificationEngine {
       confidence: const ConfidenceScoreModel.inconclusive(),
       checks: const [],
       messages: [
-        'The captured image is not recognized as a Pakistani currency note.',
+        'The uploaded image is not of Pakistani currency.',
         ...reasons,
       ],
       analyzedAt: _now,
@@ -176,7 +176,7 @@ class VerificationEngine {
         confidence: const ConfidenceScoreModel.inconclusive(),
         checks: const [],
         messages: [
-          'The captured image is not recognized as a Pakistani currency note.',
+          'The uploaded image is not of Pakistani currency.',
           ...analysis.rejectionReasons,
         ],
         analyzedAt: _now,

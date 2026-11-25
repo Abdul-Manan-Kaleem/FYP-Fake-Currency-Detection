@@ -90,9 +90,7 @@ class _NotANoteDialog extends StatelessWidget {
       'Only part of the note is in the image. The app checks '
           'the whole note, so a half or cut-off note cannot be verified.',
     _ =>
-      'The captured image is not recognized as a Pakistani currency '
-          'note. Please ensure the note is placed on a flat surface with '
-          'sufficient lighting and try again.',
+      'The uploaded image is not of Pakistani currency.',
   };
 
   @override
