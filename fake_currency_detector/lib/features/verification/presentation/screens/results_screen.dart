@@ -389,8 +389,7 @@ class _SummaryCard extends StatelessWidget {
       VerificationVerdict.real =>
         'The note passed all of the app\'s checks. It looks REAL.',
       VerificationVerdict.fake =>
-        'This note is FAKE. At least one required check failed (see the '
-            'items marked FAIL below).',
+        'This note is FAKE. See the items marked FAIL below.',
       VerificationVerdict.unableToVerify || VerificationVerdict.incomplete =>
         'We could not verify this note. This does not mean it is fake.',
       VerificationVerdict.notBanknote => 'This does not look like a banknote.',
