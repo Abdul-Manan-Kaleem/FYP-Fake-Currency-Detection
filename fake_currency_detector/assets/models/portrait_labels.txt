@@ -1,0 +1,8 @@
+0 portrait_10
+1 portrait_20
+2 portrait_50
+3 portrait_100
+4 portrait_500
+5 portrait_1000
+6 portrait_5000
+7 invalid

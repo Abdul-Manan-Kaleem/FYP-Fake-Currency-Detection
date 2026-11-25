@@ -241,6 +241,12 @@ class VerificationEngine {
         analysis.monument,
         _agreedDenomination(front, back) ?? front.denomination,
       ),
+      // Quaid-e-Azam portrait on the front, checked the same way as the
+      // monument on the back.
+      _portrait(
+        analysis.portrait,
+        _agreedDenomination(front, back) ?? front.denomination,
+      ),
     ];
 
     // ---- Step 3: weighted score ----
@@ -322,7 +328,11 @@ class VerificationEngine {
     // other check passed.
     final monumentFailed = checks.any(
         (c) => c.id == FeatureCheckId.monument && c.status == CheckStatus.fail);
+    // The same holds for a confidently wrong Quaid-e-Azam portrait on the front.
+    final portraitFailed = checks.any(
+        (c) => c.id == FeatureCheckId.portrait && c.status == CheckStatus.fail);
     final verdict = (monumentFailed ||
+            portraitFailed ||
             failures.isNotEmpty ||
             band != ScoreBand.authentic)
         ? VerificationVerdict.fake
@@ -337,6 +347,9 @@ class VerificationEngine {
       if (monumentFailed && denom != null)
         'Fake note: the monument on the back does not match. A Rs $denom '
             'note should show ${CurrencyRules.monuments[denom]}.',
+      if (portraitFailed && denom != null)
+        'Fake note: the Quaid-e-Azam portrait on the front does not match a '
+            'Rs $denom note.',
       if (failures.isEmpty && skipped.isEmpty)
         analysis.rs5000OnlyReason == null
             ? 'All YOLO11s security features and OCR serial checks passed, '
@@ -1441,6 +1454,102 @@ class VerificationEngine {
       status: CheckStatus.fail,
       summary: 'Wrong back side: this is not a genuine Rs $denomination note '
           '($seenName instead of $expectedName)',
+      critical: true,
+      details: details,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // ---- Check: front-side Quaid-e-Azam portrait ----
+  // ---------------------------------------------------------------------------
+
+  /// Check 12: the Quaid-e-Azam portrait on the FRONT (same method as the
+  /// monument check on the back). Pass: the note's own portrait design with
+  /// >= 0.60. Fail (-> FAKE): another value's design or 'invalid' with >= 0.60.
+  /// Below 0.60: not checked, never fail.
+  ///  * skipped: model missing, not trained on this denomination, unknown
+  ///    denomination, or confidence under 0.60.
+  ///  * warning: the model is preliminary (not "verified"): reported only.
+  ///  * fail: a verified model confidently sees a different front.
+  /// Weight 10. Critical, and evaluate() turns it into a FAKE result.
+  FeatureCheckModel _portrait(PortraitResultModel? p, int? denomination) {
+    const title = 'Quaid-e-Azam Portrait';
+    FeatureCheckModel skipped(String summary) => _check(
+          id: FeatureCheckId.portrait,
+          title: title,
+          weight: ScoreWeights.portrait,
+          status: CheckStatus.skipped,
+          summary: summary,
+        );
+
+    if (p == null) return skipped('Not run');
+    if (!p.modelAvailable) {
+      return skipped('Portrait model not installed '
+          '(assets/models/portrait_classifier.tflite)');
+    }
+    if (denomination == null || !CurrencyRules.isSupported(denomination)) {
+      return skipped('Denomination unknown, so the expected portrait is unknown');
+    }
+    if (p.knownDenominations.isNotEmpty &&
+        !p.knownDenominations.contains(denomination)) {
+      return skipped('Portrait model not trained on Rs $denomination yet');
+    }
+
+    final seenDenom = p.denomination;
+    final seenName =
+        seenDenom == null ? 'no valid portrait' : 'the Rs $seenDenom portrait';
+    final details = [
+      CheckDetailModel(
+          label: 'Expected', value: 'Quaid-e-Azam portrait of Rs $denomination'),
+      CheckDetailModel(
+        label: 'Model says',
+        value: '${p.label ?? '—'} · ${_pct(p.confidence)}',
+        ok: p.confidence < CurrencyRules.portraitMinConfidence
+            ? null
+            : seenDenom == denomination,
+      ),
+    ];
+
+    if (p.confidence < CurrencyRules.portraitMinConfidence) {
+      return _check(
+        id: FeatureCheckId.portrait,
+        title: title,
+        weight: ScoreWeights.portrait,
+        status: CheckStatus.skipped,
+        summary: 'Portrait not clear (${_pct(p.confidence)}) · '
+            'take a clearer photo of the front',
+        details: details,
+      );
+    }
+    if (seenDenom == denomination) {
+      return _check(
+        id: FeatureCheckId.portrait,
+        title: title,
+        weight: ScoreWeights.portrait,
+        status: CheckStatus.pass,
+        summary: 'Front side verified – Quaid-e-Azam portrait matched',
+        confidence: p.confidence,
+        details: details,
+      );
+    }
+    if (!p.verified) {
+      return _check(
+        id: FeatureCheckId.portrait,
+        title: title,
+        weight: ScoreWeights.portrait,
+        status: CheckStatus.warning,
+        summary: 'Front looks like $seenName, expected the Rs $denomination '
+            'design · preliminary model, please check the front yourself',
+        details: details,
+      );
+    }
+    return _check(
+      id: FeatureCheckId.portrait,
+      title: title,
+      weight: ScoreWeights.portrait,
+      status: CheckStatus.fail,
+      summary: 'Wrong front side: the portrait side does not match a genuine '
+          'Rs $denomination note ($seenName instead)',
       critical: true,
       details: details,
     );

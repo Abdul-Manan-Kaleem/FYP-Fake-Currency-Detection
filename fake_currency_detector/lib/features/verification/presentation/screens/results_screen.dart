@@ -129,23 +129,33 @@ class ResultsScreen extends ConsumerWidget {
                 Center(child: VerdictBadge(verdict: verdict)),
                 const SizedBox(height: 20),
                 // Red banner, only when the note is fake because of a
-                // photocopy or a wrong monument on the back. (Other fake
-                // reasons are listed in the summary and the features list.)
+                // photocopy, a wrong monument on the back or a wrong
+                // Quaid-e-Azam portrait on the front. (Other fake reasons are
+                // listed in the summary and the features list.)
                 if (verdict == VerificationVerdict.fake &&
                     (result.analysis?.rejectionKind == 'photocopy' ||
                         result.checks.any((c) =>
-                            c.id == FeatureCheckId.monument &&
+                            (c.id == FeatureCheckId.monument ||
+                                c.id == FeatureCheckId.portrait) &&
                             c.status == CheckStatus.fail))) ...[
                   result.analysis?.rejectionKind == 'photocopy'
                       ? const _FakeBanner(
                           english:
                               'This looks like a photocopy or printout on paper.',
                         )
-                      : _FakeBanner(
-                          english: 'Backside monument mismatch: Rs '
-                              '${result.denomination ?? ''} must show '
-                              '${CurrencyRules.monuments[result.denomination] ?? 'its monument'}.',
-                        ),
+                      : result.checks.any((c) =>
+                              c.id == FeatureCheckId.monument &&
+                              c.status == CheckStatus.fail)
+                          ? _FakeBanner(
+                              english: 'Backside monument mismatch: Rs '
+                                  '${result.denomination ?? ''} must show '
+                                  '${CurrencyRules.monuments[result.denomination] ?? 'its monument'}.',
+                            )
+                          : _FakeBanner(
+                              english: 'Front portrait mismatch: the '
+                                  'Quaid-e-Azam portrait side does not match a '
+                                  'Rs ${result.denomination ?? ''} note.',
+                            ),
                   const SizedBox(height: 16),
                 ],
                 // Summary in plain words: what happened and what to do

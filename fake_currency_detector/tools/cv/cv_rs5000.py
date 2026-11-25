@@ -1,4 +1,4 @@
-﻿"""10-fold cross-validation of the Rs 5,000 genuine / altered classifier (MobileNetV3-Large).
+"""10-fold cross-validation of the Rs 5,000 genuine / altered classifier (MobileNetV3-Large).
 
 Genuine class = the real Rs 5,000 photos in DataSet/5000.
 Altered class = the same photos with one localised alteration (blur, noise, brightness,

@@ -1,0 +1,61 @@
+{
+  "verified": true,
+  "classes": [
+    "portrait_10",
+    "portrait_20",
+    "portrait_50",
+    "portrait_100",
+    "portrait_500",
+    "portrait_1000",
+    "portrait_5000",
+    "invalid"
+  ],
+  "per_class": {
+    "portrait_10": {
+      "test_photos": 35,
+      "accuracy": 1.0
+    },
+    "portrait_20": {
+      "test_photos": 53,
+      "accuracy": 1.0
+    },
+    "portrait_50": {
+      "test_photos": 57,
+      "accuracy": 1.0
+    },
+    "portrait_100": {
+      "test_photos": 54,
+      "accuracy": 1.0
+    },
+    "portrait_500": {
+      "test_photos": 56,
+      "accuracy": 1.0
+    },
+    "portrait_1000": {
+      "test_photos": 87,
+      "accuracy": 1.0
+    },
+    "portrait_5000": {
+      "test_photos": 46,
+      "accuracy": 1.0
+    },
+    "invalid": {
+      "test_photos": 260,
+      "accuracy": 1.0
+    }
+  },
+  "images_per_class": {
+    "portrait_10": 175,
+    "portrait_20": 259,
+    "portrait_50": 258,
+    "portrait_100": 260,
+    "portrait_500": 268,
+    "portrait_1000": 250,
+    "portrait_5000": 218,
+    "invalid": 1217
+  },
+  "preprocess": "letterbox",
+  "input": "float32 [1,224,224,3], whole image letterboxed on grey 114, x/127.5-1",
+  "trained_at": "2026-11-25T23:40:33",
+  "source": "C:\\Users\\manan\\Desktop\\FYP 2\\DataSet_portrait"
+}

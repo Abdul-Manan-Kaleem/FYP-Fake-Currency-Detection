@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/verification_exception.dart';
 import '../../../../core/utils/haptics.dart';
+import '../../../history/data/scan_history_database.dart';
 import '../../data/models/verification_result_model.dart';
 import '../../data/on_device/microprint_reader.dart';
 import '../../data/repositories/on_device_currency_verification_repository.dart';
@@ -118,6 +119,11 @@ class VerificationController extends Notifier<VerificationState> {
         default:
           await Haptics.tap();
       }
+      // Save the scan (time, denomination, every feature result, score and
+      // verdict) in the phone's history database. A storage problem is only
+      // logged and never stops the result from showing.
+      await saveScanQuietly(ref.read(scanHistoryDatabaseProvider), result);
+      if (run != _run) return;
       state = VerificationState(
         status: VerificationStatus.completed,
         result: result,

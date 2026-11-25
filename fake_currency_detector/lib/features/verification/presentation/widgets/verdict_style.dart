@@ -92,5 +92,6 @@ extension FeatureCheckIcon on FeatureCheckId {
         FeatureCheckId.smallCnn => Icons.verified_user_outlined,
         FeatureCheckId.microprint => Icons.zoom_in_rounded,
         FeatureCheckId.monument => Icons.account_balance_outlined,
+        FeatureCheckId.portrait => Icons.face_retouching_natural_outlined,
       };
 }

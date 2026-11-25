@@ -393,6 +393,7 @@ void main() {
         FeatureCheckId.securityThread,
         FeatureCheckId.microprint, // sample has no border OCR
         FeatureCheckId.monument, // sample has no monument result
+        FeatureCheckId.portrait, // sample has no portrait result
       });
       expect(r.verdict, VerificationVerdict.real);
       expect(r.messages.any((m) => m.startsWith('Not checked')), isTrue);
@@ -660,7 +661,8 @@ void main() {
         r.checks.any((c) =>
             c.status == CheckStatus.skipped &&
             c.id != FeatureCheckId.microprint &&
-            c.id != FeatureCheckId.monument),
+            c.id != FeatureCheckId.monument &&
+            c.id != FeatureCheckId.portrait),
         isFalse,
       );
     });

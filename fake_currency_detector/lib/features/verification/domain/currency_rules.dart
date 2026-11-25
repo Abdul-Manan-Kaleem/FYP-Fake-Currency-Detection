@@ -112,6 +112,9 @@ abstract final class CurrencyRules {
   /// Monument predictions below this never fail a note.
   static const double monumentMinConfidence = 0.60;
 
+  /// Quaid-e-Azam portrait predictions below this never fail a note.
+  static const double portraitMinConfidence = 0.60;
+
   /// True when this value is one of the seven supported notes.
   static bool isSupported(int? value) => denominations.containsKey(value);
 }
@@ -154,6 +157,10 @@ abstract final class ScoreWeights {
   /// Back-side monument. A confident mismatch also overrides the verdict to
   /// FAKE (see VerificationEngine).
   static const double monument = 20;
+
+  /// Front-side Quaid-e-Azam portrait. Like the monument, a confident
+  /// mismatch overrides the verdict to FAKE (see VerificationEngine).
+  static const double portrait = 10;
 
   /// Multiplier applied when a core requirement (serial or denomination)
   /// fails; the result is additionally capped below the 40% line.

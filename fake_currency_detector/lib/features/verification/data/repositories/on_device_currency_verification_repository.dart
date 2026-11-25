@@ -18,6 +18,7 @@ import '../on_device/note_presence.dart';
 import '../on_device/note_side_classifier.dart';
 import '../on_device/partial_note_detector.dart';
 import '../on_device/pkr5000_counterfeit_classifier.dart';
+import '../on_device/portrait_classifier.dart';
 import '../on_device/note_text_parser.dart';
 import '../on_device/rs5000_anomaly_classifier.dart';
 import '../on_device/yolo_decoder.dart';
@@ -142,6 +143,9 @@ class OnDeviceCurrencyVerificationRepository
 
   /// Back-side monument classifier. Resolves to null if not installed.
   Future<MonumentClassifier?>? _monument;
+
+  /// Front-side Quaid-e-Azam portrait classifier. Resolves to null if not installed.
+  Future<PortraitClassifier?>? _portrait;
 
   /// Scans by image path. A path is a unique captured file, so a retake is a
   /// new entry; old entries are dropped on [forget].
@@ -602,6 +606,36 @@ class OnDeviceCurrencyVerificationRepository
         }
       }
 
+      // ---- Step 3b: Quaid-e-Azam portrait on the front ----
+      // Same idea as the monument check on the back: a small image classifier
+      // looks at the whole front photo. A failure here is only logged; the
+      // check then reports "not clear" instead of stopping the scan.
+      sw = Stopwatch()..start();
+      final portraitModel = await (_portrait ??= PortraitClassifier.tryLoad());
+      var portraitResult = const PortraitResultModel.notInstalled();
+      if (portraitModel != null) {
+        try {
+          final p = await portraitModel.classify(fs.prepared.pixels);
+          debugPrint('Portrait ${front.path} → ${p.label} '
+              '${p.confidence.toStringAsFixed(2)}');
+          portraitResult = PortraitResultModel(
+            modelAvailable: true,
+            label: p.label,
+            confidence: p.confidence,
+            verified: portraitModel.verified,
+            knownDenominations: portraitModel.knownDenominations,
+          );
+        } on Object catch (e) {
+          debugPrint('Portrait classification failed: $e');
+          portraitResult = PortraitResultModel(
+            modelAvailable: true,
+            verified: portraitModel.verified,
+            knownDenominations: portraitModel.knownDenominations,
+          );
+        }
+      }
+      timings['portrait'] = lap(sw);
+
       // ---- Step 4: assemble the evidence bundle ----
       // The monument result comes from the back-side scan done earlier.
       timings['total'] = lap(total);
@@ -627,6 +661,7 @@ class OnDeviceCurrencyVerificationRepository
                 knownDenominations: bs.monumentKnown,
               )
             : const MonumentResultModel.notInstalled(),
+        portrait: portraitResult,
         rs5000OnlyReason: rs5000Only,
         timingsMs: timings,
         detections: detections,
@@ -735,5 +770,6 @@ class OnDeviceCurrencyVerificationRepository
     (await _counterfeitCnn)?.close();
     (await _smallCnn)?.close();
     (await _monument)?.close();
+    (await _portrait)?.close();
   }
 }

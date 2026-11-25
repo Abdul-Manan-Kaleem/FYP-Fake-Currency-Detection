@@ -315,6 +315,7 @@ class NoteAnalysisModel {
     this.smallCnnSkipReason,
     this.microprint,
     this.monument,
+    this.portrait,
     this.rs5000OnlyReason,
     this.rejectionKind,
     this.rejectionReasons = const [],
@@ -355,6 +356,9 @@ class NoteAnalysisModel {
   /// Back-side monument check. Null when the analysis did not reach it.
   final MonumentResultModel? monument;
 
+  /// Front-side Quaid-e-Azam portrait check. Null when the analysis did not reach it.
+  final PortraitResultModel? portrait;
+
   /// Edge microprint (Rs 5,000 only for now). Null when not read.
   final MicroprintModel? microprint;
 
@@ -389,6 +393,7 @@ class NoteAnalysisModel {
         smallCnnSkipReason: smallCnnSkipReason,
         microprint: value,
         monument: monument,
+        portrait: portrait,
         rs5000OnlyReason: rs5000OnlyReason,
         rejectionKind: rejectionKind,
         rejectionReasons: rejectionReasons,
@@ -425,6 +430,9 @@ class NoteAnalysisModel {
       monument: m(json['monument']) == null
           ? null
           : MonumentResultModel.fromJson(m(json['monument'])!),
+      portrait: m(json['portrait']) == null
+          ? null
+          : PortraitResultModel.fromJson(m(json['portrait'])!),
       microprint: m(json['microprint']) == null
           ? null
           : MicroprintModel.fromJson(m(json['microprint'])!),
@@ -461,6 +469,7 @@ class NoteAnalysisModel {
         'small_cnn_skip_reason': smallCnnSkipReason,
         'microprint': microprint?.toJson(),
         'monument': monument?.toJson(),
+        'portrait': portrait?.toJson(),
         'rs5000_only_reason': rs5000OnlyReason,
         'rejection_kind': rejectionKind,
         'rejection_reasons': rejectionReasons,
@@ -689,6 +698,65 @@ class MonumentResultModel {
   /// Builds from JSON. Unreadable denominations in the list are skipped.
   factory MonumentResultModel.fromJson(Map<String, dynamic> json) =>
       MonumentResultModel(
+        modelAvailable: json['model_available'] == true,
+        label: json['label'] as String?,
+        confidence: _d(json['confidence']),
+        verified: json['verified'] == true,
+        knownDenominations: [
+          for (final v in (json['known_denominations'] as List? ?? const []))
+            if (_i(v) != null) _i(v)!,
+        ],
+      );
+
+  /// Converts to JSON.
+  Map<String, dynamic> toJson() => {
+        'model_available': modelAvailable,
+        'label': label,
+        'confidence': confidence,
+        'verified': verified,
+        'known_denominations': knownDenominations,
+      };
+}
+
+/// Front-side Quaid-e-Azam portrait classifier output (same shape as
+/// [MonumentResultModel]): labels are 'portrait_<value>' or 'invalid'.
+class PortraitResultModel {
+  const PortraitResultModel({
+    required this.modelAvailable,
+    this.label,
+    this.confidence = 0,
+    this.verified = false,
+    this.knownDenominations = const [],
+  });
+
+  /// A "model not installed" result: no label, no confidence.
+  const PortraitResultModel.notInstalled() : this(modelAvailable: false);
+
+  /// False when the portrait model file is not in the app.
+  final bool modelAvailable;
+
+  /// Predicted class, e.g. 'portrait_100' or 'invalid'.
+  final String? label;
+
+  /// Confidence of the predicted [label], 0..1.
+  final double confidence;
+
+  /// True only when the training pipeline measured a good accuracy per class
+  /// on held-out photos. Unverified models never make a note FAKE.
+  final bool verified;
+
+  /// Denominations the model was trained on (others cannot be checked).
+  final List<int> knownDenominations;
+
+  /// Denomination whose portrait design was recognised; null for 'invalid'.
+  int? get denomination {
+    final m = RegExp(r'^portrait_(\d+)$').firstMatch(label ?? '');
+    return m == null ? null : int.parse(m.group(1)!);
+  }
+
+  /// Builds from JSON. Unreadable denominations in the list are skipped.
+  factory PortraitResultModel.fromJson(Map<String, dynamic> json) =>
+      PortraitResultModel(
         modelAvailable: json['model_available'] == true,
         label: json['label'] as String?,
         confidence: _d(json['confidence']),

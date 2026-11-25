@@ -39,6 +39,10 @@ from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 CLASSES = ['monument_10', 'monument_20', 'monument_50', 'monument_100',
            'monument_500', 'monument_1000', 'monument_5000', 'invalid']
+# File-name prefix of the output files. 'monument' for the back-side monument model;
+# `--kind portrait` switches to the front-side Quaid-e-Azam portrait model
+# (classes portrait_<value> + invalid, files portrait_classifier.tflite ...).
+OUT_PREFIX = 'monument'
 DENOMS = {0: 1000, 1: 100, 2: 10, 3: 20, 4: 5000, 5: 500, 6: 50}   # YOLO note classes
 FRONT_ONLY = {7, 9, 10, 11, 12}   # printed_year, dots, lines, thread, serial
 SEAL = 8
@@ -380,11 +384,11 @@ def train(sorted_dir, out_dir, install, min_per_class, epochs, seed):
     }
     target = out_dir if not install else install
     os.makedirs(target, exist_ok=True)
-    with open(os.path.join(target, 'monument_classifier.tflite'), 'wb') as f:
+    with open(os.path.join(target, f'{OUT_PREFIX}_classifier.tflite'), 'wb') as f:
         f.write(tflite)
-    with open(os.path.join(target, 'monument_labels.txt'), 'w', encoding='utf8') as f:
+    with open(os.path.join(target, f'{OUT_PREFIX}_labels.txt'), 'w', encoding='utf8') as f:
         f.write(''.join(f'{i} {c}\n' for i, c in enumerate(classes)))
-    with open(os.path.join(target, 'monument_model_info.json'), 'w', encoding='utf8') as f:
+    with open(os.path.join(target, f'{OUT_PREFIX}_model_info.json'), 'w', encoding='utf8') as f:
         json.dump(info, f, indent=2)
     print(f'\nWritten to {os.path.abspath(target)}. Rebuild the app: '
           'flutter build apk --release --split-per-abi')
@@ -533,7 +537,13 @@ if __name__ == '__main__':
                          '(for example --folds 10); nothing is installed in the app')
     ap.add_argument('--cv-report', default='monument_cv_report.json',
                     help='where --folds writes its JSON report')
+    ap.add_argument('--kind', choices=['monument', 'portrait'], default='monument',
+                    help='portrait = train the front-side Quaid-e-Azam portrait model from a '
+                         '--sorted folder with portrait_<value> sub-folders and invalid')
     a = ap.parse_args()
+    if a.kind == 'portrait':
+        CLASSES = [f'portrait_{d}' for d in (10, 20, 50, 100, 500, 1000, 5000)] + ['invalid']
+        OUT_PREFIX = 'portrait'
 
     if a.labelled:
         sorted_dir = sort_labelled(a.labelled, a.yolo)

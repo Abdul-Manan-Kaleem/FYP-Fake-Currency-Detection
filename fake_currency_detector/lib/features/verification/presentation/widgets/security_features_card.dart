@@ -83,6 +83,9 @@ class SecurityFeaturesCard extends StatelessWidget {
       _fromCheck('SBP seals', FeatureCheckId.sbpSeals),
       _fromCheck('Serial numbers', FeatureCheckId.serialNumber),
       _fromCheck('Printed year', FeatureCheckId.printedYear),
+      // Picture checks: Quaid-e-Azam portrait (front) and monument (back).
+      _fromCheck('Quaid-e-Azam portrait (front)', FeatureCheckId.portrait),
+      _fromCheck('Monument (back)', FeatureCheckId.monument),
     ];
     final missing = rows.any((r) => r.status == CheckStatus.fail);
 

@@ -30,7 +30,8 @@ How a note is checked:
 4. **Classify** with MobileNetV3 models: two for Rs5,000 notes (alteration and genuine/counterfeit). A
    MobileNetV3-Small model for Rs10 to Rs1,000 is built in but switched off for now
    (`kSmallCnnEnabled` in `currency_rules.dart`).
-5. **Check the monument** printed on the back against the denomination.
+5. **Check the monument** printed on the back and the **Quaid-e-Azam portrait** on the front against the
+   denomination (two small image classifiers; a confident mismatch is FAKE).
 6. **Decide** with a rule engine. The verdict is only **REAL** or **FAKE**: any failed feature makes the
    note FAKE. UNABLE TO VERIFY, INCOMPLETE and NOT A BANKNOTE are shown only when the photos cannot be
    judged (a poor photo or a missed detection is never reported as a counterfeit). The result screen
@@ -60,6 +61,13 @@ Taken from the training notebooks in this repository (test sets of each model):
 | Monument classifier | Building on the back, 7 monuments + invalid | 1.000 per monument, 0.985 invalid |
 
 These are model scores on their own test sets, not the accuracy of the whole app on real notes.
+
+## Scan history
+
+Every scan is saved automatically in a local SQLite database (time, denomination, result, confidence, the
+status of each security feature). The History button on the capture screen lists the scans and exports them
+as CSV. Study notes for the viva (database vs CSV, how the confidence score is calculated) are in
+`fake_currency_detector/docs/VIVA_NOTES.md`.
 
 ## 10-fold cross-validation
 

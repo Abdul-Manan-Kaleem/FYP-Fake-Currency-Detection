@@ -11,6 +11,7 @@ import '../../../verification/presentation/widgets/note_identity_banner.dart';
 import '../../domain/capture_models.dart';
 import '../controllers/capture_controller.dart';
 import '../widgets/flip_prompt.dart';
+import '../../../history/presentation/history_screen.dart';
 import '../widgets/holo_preview_card.dart';
 import '../widgets/scanner_hud.dart';
 import '../widgets/step_indicator.dart';
@@ -117,6 +118,16 @@ class CaptureScreen extends ConsumerWidget {
       // Top bar: title, plus a "start over" button after the first step.
       appBar: AppBar(
         title: const Text('FAKE CURRENCY DETECTOR'),
+        // Saved scans (SQLite) with CSV export.
+        actions: [
+          IconButton(
+            tooltip: 'Scan history',
+            icon: const Icon(Icons.history_rounded),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
+            ),
+          ),
+        ],
         leading: state.step == CaptureStep.front
             ? null
             : IconButton(

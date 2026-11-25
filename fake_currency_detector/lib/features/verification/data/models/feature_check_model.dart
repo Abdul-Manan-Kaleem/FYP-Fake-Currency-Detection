@@ -38,6 +38,9 @@ enum FeatureCheckId {
 
   /// Monument picture on the back of the note.
   monument,
+
+  /// Quaid-e-Azam portrait on the front of the note.
+  portrait,
 }
 
 /// `skipped`: could not run (missing model). `notApplicable`: this
