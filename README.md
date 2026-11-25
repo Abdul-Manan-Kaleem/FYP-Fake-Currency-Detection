@@ -21,14 +21,13 @@ How a note is checked:
 1. **Capture** both sides with the ML Kit document scanner (or gallery, or basic camera). After each
    photo the app checks it is a banknote and that it is the right side.
 2. **Detect** the denomination and six features (printed year, SBP seal, security dots, security lines,
-   security thread, serial number) with **YOLO11s**.
+   security thread, serial number) with **YOLOv11s**.
 3. **Read** the two serial numbers and the printed year with ML Kit text recognition.
-4. **Classify** with MobileNetV3 models: two for Rs5,000 notes (alteration and genuine/counterfeit). A
-   MobileNetV3-Small model for Rs10 to Rs1,000 is built in but switched off for now
+4. **Classify** with MobileNetV3 Large models: two for Rs5,000 notes (alteration and genuine/counterfeit).
    (`kSmallCnnEnabled` in `currency_rules.dart`).
 5. **Check the monument** printed on the back against the denomination.
-6. **Decide** with a rule engine that returns one of: PASSED APP CHECKS, SUSPICIOUS, UNABLE TO VERIFY,
-   FAKE (only for a clear monument mismatch), INCOMPLETE, or NOT A BANKNOTE. A poor photo or a missed
+6. **Decide** with a rule engine that returns one of: PASSED APP CHECKS, UNABLE TO VERIFY,
+   FAKE, INCOMPLETE, or NOT A BANKNOTE. A poor photo or a missed
    detection is never reported as a counterfeit.
 
 Everything runs on the phone through TensorFlow Lite.
@@ -60,8 +59,7 @@ Nothing is installed into the app.
 
 Details, commands and limits are in [`fake_currency_detector/tools/cv/README.md`](fake_currency_detector/tools/cv/README.md).
 A draft report is in `fake_currency_detector/docs/cv_report/`; the final numbers are produced by
-`tools/cv/build_final_report.py` once all three tests have finished. MobileNetV3-Small is not part of this
-run (its Genuine/Fake training photos are not available).
+`tools/cv/build_final_report.py` once all three tests have finished.
 
 ## Repository layout
 
@@ -73,7 +71,7 @@ fake_currency_detector/   Flutter app (current)
   tools/                  Training and parity helper scripts
   tools/cv/               10-fold cross-validation scripts and report builder
   docs/cv_report/         10-fold cross-validation report (draft, Word + PDF)
-notebooks/                Earlier training notebooks
+notebooks/                Earlier training notebooks and code for model trained in app
 model/                    Earlier exported model files
 monument_model_out/       Monument classifier labels and info
 Data-Set/                 Link to the dataset
