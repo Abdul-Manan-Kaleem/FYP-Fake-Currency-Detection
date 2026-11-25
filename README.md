@@ -127,13 +127,6 @@ Android Studio, open the `fake_currency_detector` folder.
 `.github/workflows/build_apk.yml` builds a release APK on GitHub Actions for pushes to `main` (or by hand
 from the Actions tab) and uploads it as an artifact.
 
-`.github/workflows/build_ios.yml` builds the iPhone version on a GitHub macOS machine (iOS cannot be built
-on Windows) for pushes to `improvements` or by hand, and uploads an **unsigned** `.ipa` as the
-`ios-unsigned-ipa` artifact. Install it on an iPhone with AltStore or Sideloadly using your own Apple ID
-(a free Apple ID lasts 7 days), or sign it with an Apple Developer account. The Android document scanner is
-not available on iPhone; the app uses the normal camera there. The iPhone build has not been tested on a
-device.
-
 ## Team
 
 Muhammad Usman, Abdul Manan Kaleem and M. Waleed bin Naeem. Supervisor: Mr. Junaid Khan.
