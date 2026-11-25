@@ -40,7 +40,7 @@ Taken from the training notebooks in this repository (test sets of each model):
 | Model | Task | Result |
 |---|---|---|
 | YOLO11s | Denominations and 6 features (348 usable test images) | mAP@0.50 0.9803, mAP@0.50:0.95 0.8722 |
-| MobileNetV3-Large | Rs5,000 genuine vs synthetically altered (141 images) | Accuracy 0.9433, ROC AUC 0.9885 |
+| MobileNetV3-Large | Rs5,000 genuine vs synthetically altered (141 images) | Accuracy 0.9123, ROC AUC 0.9886 |
 | Monument classifier | Building on the back, 7 monuments + invalid | 1.000 per monument, 0.985 invalid |
 
 These are model scores on their own test sets, not the accuracy of the whole app on real notes.
@@ -105,4 +105,10 @@ from the Actions tab) and uploads it as an artifact.
 
 ## Team
 
-Muhammad Usman, Abdul Manan Kaleem and M. Waleed bin Naeem. Supervisor: Mr. Junaid Khan.
+Group Members:
+Muhammad Usman (40198)
+Abdul Manan Kaleem (55762)
+M. Waleed bin Naeem (46541)
+
+Supervisor:
+Mr. Junaid Khan.
