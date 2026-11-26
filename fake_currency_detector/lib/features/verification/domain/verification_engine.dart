@@ -1472,7 +1472,7 @@ class VerificationEngine {
   ///  * warning: the model is preliminary (not "verified"): reported only.
   ///  * fail: a verified model confidently sees a different front.
   /// Weight 10. Critical, and evaluate() turns it into a FAKE result.
-  FeatureCheckModel _portrait(PortraitResultModel? p, int? denomination) {
+  FeatureCheckModel _portraitDesign(PortraitResultModel? p, int? denomination) {
     const title = 'Quaid-e-Azam Portrait';
     FeatureCheckModel skipped(String summary) => _check(
           id: FeatureCheckId.portrait,
@@ -1553,6 +1553,74 @@ class VerificationEngine {
       critical: true,
       details: details,
     );
+  }
+
+  /// The portrait check shown to the user. It combines two small models:
+  ///  * the DESIGN model ([_portraitDesign]): is this the front of the right
+  ///    note value?
+  ///  * the FACE model: is the portrait the genuine Quaid-e-Azam, or has it
+  ///    been changed (another person, glasses, earrings, a nose pin, a smile
+  ///    or sad mouth drawn on it, covered)?
+  /// The check passes only when the face model says "genuine" (and the design
+  /// does not fail). A confident "tampered" (60% or more) from a verified face
+  /// model fails the check and makes the note FAKE. Below 60% it is "not
+  /// checked", never a fail. Without the face model the check works as before.
+  FeatureCheckModel _portrait(PortraitResultModel? p, int? denomination) {
+    const title = 'Quaid-e-Azam Portrait';
+    final design = _portraitDesign(p, denomination);
+    if (p == null || !p.faceAvailable) return design;
+
+    final minConf = CurrencyRules.portraitMinConfidence;
+    final genuine = p.faceLabel == 'genuine';
+    final clear = p.faceLabel != null && p.faceConfidence >= minConf;
+    final details = [
+      ...design.details,
+      CheckDetailModel(
+        label: 'Face check',
+        value: '${p.faceLabel ?? '—'} · ${_pct(p.faceConfidence)}',
+        ok: clear ? genuine : null,
+      ),
+    ];
+    FeatureCheckModel make(CheckStatus status, String summary,
+            {double confidence = 1, bool critical = false}) =>
+        _check(
+          id: FeatureCheckId.portrait,
+          title: title,
+          weight: ScoreWeights.portrait,
+          status: status,
+          summary: summary,
+          confidence: confidence,
+          critical: critical,
+          details: details,
+        );
+
+    // A wrong front design already failed: keep that result.
+    if (design.status == CheckStatus.fail) {
+      return make(CheckStatus.fail, design.summary, critical: true);
+    }
+    if (!clear) {
+      return make(CheckStatus.skipped,
+          'Portrait face not clear (${_pct(p.faceConfidence)}) · take a clearer photo of the front');
+    }
+    if (!genuine) {
+      if (!p.faceVerified) {
+        return make(CheckStatus.warning,
+            'The portrait may be changed · preliminary model, please check the portrait yourself');
+      }
+      return make(
+        CheckStatus.fail,
+        'The portrait is not the genuine Quaid-e-Azam portrait (another face, '
+        'an accessory such as glasses, earrings or a nose pin, or a changed expression)',
+        critical: true,
+      );
+    }
+    // The face is the genuine portrait.
+    if (design.status == CheckStatus.warning) return design;
+    final conf = design.status == CheckStatus.pass
+        ? (p.faceConfidence < p.confidence ? p.faceConfidence : p.confidence)
+        : p.faceConfidence;
+    return make(CheckStatus.pass, 'Front side verified – Quaid-e-Azam portrait matched',
+        confidence: conf);
   }
 
   /// Formats 0..1 as a whole-number percent, for example 0.87 -> "87%".

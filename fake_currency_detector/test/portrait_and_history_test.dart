@@ -118,6 +118,66 @@ void main() {
     });
   });
 
+  group('portrait face check (genuine Quaid-e-Azam vs changed)', () {
+    PortraitResultModel face(String? label, double conf,
+            {bool verified = true,
+            String design = 'portrait_100',
+            double designConf = 0.93}) =>
+        PortraitResultModel(
+          modelAvailable: true,
+          verified: true,
+          label: design,
+          confidence: designConf,
+          faceAvailable: true,
+          faceLabel: label,
+          faceConfidence: conf,
+          faceVerified: verified,
+        );
+
+    test('genuine face and right design: PASS, note stays REAL', () {
+      final r = engine.evaluate(rs100(face('genuine', 0.95)));
+      expect(portraitCheck(r).status, CheckStatus.pass);
+      expect(r.verdict, VerificationVerdict.real);
+    });
+
+    test('another person / glasses / earrings / nose pin / expression: FAIL, FAKE', () {
+      final r = engine.evaluate(rs100(face('tampered', 0.88)));
+      expect(portraitCheck(r).status, CheckStatus.fail);
+      expect(portraitCheck(r).summary, contains('not the genuine Quaid-e-Azam portrait'));
+      expect(r.verdict, VerificationVerdict.fake);
+    });
+
+    test('tampered even when the front design matches is still FAKE', () {
+      final r = engine.evaluate(rs100(face('tampered', 0.75, design: 'portrait_100', designConf: 0.99)));
+      expect(r.verdict, VerificationVerdict.fake);
+    });
+
+    test('tampered below 60% is not a fail (take a clearer photo)', () {
+      final r = engine.evaluate(rs100(face('tampered', 0.55)));
+      expect(portraitCheck(r).status, CheckStatus.skipped);
+      expect(r.verdict, VerificationVerdict.real);
+    });
+
+    test('unverified face model only warns', () {
+      final r = engine.evaluate(rs100(face('tampered', 0.9, verified: false)));
+      expect(portraitCheck(r).status, CheckStatus.warning);
+    });
+
+    test('a wrong front design still fails even if the face looks genuine', () {
+      final r = engine.evaluate(rs100(face('genuine', 0.95, design: 'portrait_5000', designConf: 0.9)));
+      expect(portraitCheck(r).status, CheckStatus.fail);
+      expect(r.verdict, VerificationVerdict.fake);
+    });
+
+    test('face result survives a JSON round trip', () {
+      final a = rs100(face('tampered', 0.8));
+      final b = NoteAnalysisModel.fromJson(a.toJson());
+      expect(b.portrait!.faceAvailable, isTrue);
+      expect(b.portrait!.faceLabel, 'tampered');
+      expect(b.portrait!.faceConfidence, closeTo(0.8, 1e-9));
+    });
+  });
+
   group('scan history', () {
     VerificationResultModel result() => engine.evaluate(rs100(const PortraitResultModel(
         modelAvailable: true, verified: true, label: 'portrait_100', confidence: 0.93)));

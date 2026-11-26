@@ -147,6 +147,9 @@ class OnDeviceCurrencyVerificationRepository
   /// Front-side Quaid-e-Azam portrait classifier. Resolves to null if not installed.
   Future<PortraitClassifier?>? _portrait;
 
+  /// Face-level portrait classifier (genuine Quaid-e-Azam vs changed). Null if not installed.
+  Future<PortraitClassifier?>? _portraitFace;
+
   /// Scans by image path. A path is a unique captured file, so a retake is a
   /// new entry; old entries are dropped on [forget].
   final Map<String, Future<SideScan>> _scans = {};
@@ -634,6 +637,38 @@ class OnDeviceCurrencyVerificationRepository
           );
         }
       }
+      // Face-level model: is the portrait the genuine Quaid-e-Azam, or changed
+      // (another person, glasses, earrings, nose pin, smile / sad mouth)?
+      final faceModel = await (_portraitFace ??= PortraitClassifier.tryLoadFace());
+      if (faceModel != null) {
+        try {
+          final f = await faceModel.classify(fs.prepared.pixels);
+          debugPrint('Portrait face ${front.path} → ${f.label} '
+              '${f.confidence.toStringAsFixed(2)}');
+          portraitResult = PortraitResultModel(
+            modelAvailable: portraitResult.modelAvailable,
+            label: portraitResult.label,
+            confidence: portraitResult.confidence,
+            verified: portraitResult.verified,
+            knownDenominations: portraitResult.knownDenominations,
+            faceAvailable: true,
+            faceLabel: f.label,
+            faceConfidence: f.confidence,
+            faceVerified: faceModel.verified,
+          );
+        } on Object catch (e) {
+          debugPrint('Portrait face classification failed: $e');
+          portraitResult = PortraitResultModel(
+            modelAvailable: portraitResult.modelAvailable,
+            label: portraitResult.label,
+            confidence: portraitResult.confidence,
+            verified: portraitResult.verified,
+            knownDenominations: portraitResult.knownDenominations,
+            faceAvailable: true,
+            faceVerified: faceModel.verified,
+          );
+        }
+      }
       timings['portrait'] = lap(sw);
 
       // ---- Step 4: assemble the evidence bundle ----
@@ -771,5 +806,6 @@ class OnDeviceCurrencyVerificationRepository
     (await _smallCnn)?.close();
     (await _monument)?.close();
     (await _portrait)?.close();
+    (await _portraitFace)?.close();
   }
 }

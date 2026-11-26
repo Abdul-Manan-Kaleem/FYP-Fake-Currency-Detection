@@ -63,6 +63,10 @@ class PortraitPrediction {
 
   /// Denomination of the winning class, or null for 'invalid'.
   int? get denomination => Portraits.denominationOf(label);
+
+  /// Face-level model only: true when the label is 'genuine' (the genuine
+  /// Quaid-e-Azam portrait); false for 'tampered'.
+  bool get isGenuine => label == 'genuine';
 }
 
 /// Optional image classifier for the front-side Quaid-e-Azam portrait.
@@ -71,16 +75,19 @@ class PortraitPrediction {
 /// [tryLoad] returns null and the portrait check reports "not installed".
 class PortraitClassifier {
   PortraitClassifier._(this._interpreter, this.labels, this._size, this._input,
-      this._output, this.verified, this.letterbox);
+      this._output, this.verified, this.letterbox, this.tamperedThreshold);
 
-  /// Path of the TFLite model file inside the app assets.
+  /// Design model: which note value's front is this? (8 classes)
   static const String modelAsset = 'assets/models/portrait_classifier.tflite';
-
-  /// Path of the text file listing class names, one per output.
   static const String labelsAsset = 'assets/models/portrait_labels.txt';
-
-  /// Written by tools/train_monument.py --kind portrait. Missing = unverified.
   static const String infoAsset = 'assets/models/portrait_model_info.json';
+
+  /// Face model: is the portrait the genuine Quaid-e-Azam, or changed
+  /// (another face, glasses, earrings, nose pin, smile / sad mouth, covered)?
+  /// Trained by tools/portrait_face/train_face.py. (2 classes)
+  static const String faceModelAsset = 'assets/models/portrait_face_classifier.tflite';
+  static const String faceLabelsAsset = 'assets/models/portrait_face_labels.txt';
+  static const String faceInfoAsset = 'assets/models/portrait_face_model_info.json';
 
   /// The TFLite runtime object that actually runs the model.
   final Interpreter _interpreter;
@@ -95,6 +102,12 @@ class PortraitClassifier {
   /// padded to a square.
   final bool letterbox;
 
+  /// Face model only (`"tampered_threshold"` in the info file): a portrait is
+  /// called 'tampered' only when the model's tampered probability reaches this
+  /// value, chosen so that almost all genuine notes pass. Null for the design
+  /// model.
+  final double? tamperedThreshold;
+
   /// Denominations this model knows (from its labels).
   List<int> get knownDenominations =>
       [for (final l in labels) ?Portraits.denominationOf(l)];
@@ -108,7 +121,14 @@ class PortraitClassifier {
 
   /// Loads the model, labels and optional info file. Returns null (never
   /// throws) if anything is missing or does not match.
-  static Future<PortraitClassifier?> tryLoad() async {
+  static Future<PortraitClassifier?> tryLoad() => _load(modelAsset, labelsAsset, infoAsset);
+
+  /// Loads the face-level model (see [faceModelAsset]). Null if not installed.
+  static Future<PortraitClassifier?> tryLoadFace() =>
+      _load(faceModelAsset, faceLabelsAsset, faceInfoAsset);
+
+  static Future<PortraitClassifier?> _load(
+      String modelAsset, String labelsAsset, String infoAsset) async {
     try {
       // Step 1: read the labels and load the model.
       final labels = Monuments.parseLabels(await rootBundle.loadString(labelsAsset));
@@ -129,17 +149,21 @@ class PortraitClassifier {
       }
       // Step 3: read the optional info file (verified flag, preprocessing).
       var verified = false, letterbox = false;
+      double? threshold;
       try {
         final info = jsonDecode(await rootBundle.loadString(infoAsset));
         verified = info is Map && info['verified'] == true;
         letterbox = info is Map && info['preprocess'] == 'letterbox';
+        if (info is Map && info['tampered_threshold'] is num) {
+          threshold = (info['tampered_threshold'] as num).toDouble();
+        }
       } on Object {
         // No info file: unverified model.
       }
       debugPrint('Portrait model loaded: input $inShape ${input.type}, '
           'labels $labels, verified $verified, letterbox $letterbox');
       return PortraitClassifier._(
-          interpreter, labels, inShape[1], input, output, verified, letterbox);
+          interpreter, labels, inShape[1], input, output, verified, letterbox, threshold);
     } on Object catch (e) {
       debugPrint('Portrait model not available: $e');
       return null;
@@ -175,6 +199,21 @@ class PortraitClassifier {
     } else {
       final f = outBytes.buffer.asFloat32List();
       probs.addAll(f.map((v) => v.toDouble()));
+    }
+    // Face model with a calibrated threshold: 'tampered' only when its
+    // probability reaches the threshold. The confidence is the tampered
+    // probability for 'tampered'; for 'genuine' it falls from 1.0 (tampered
+    // probability 0) to 0.6 (right at the threshold), so a borderline portrait
+    // is reported as "not clear" rather than passed.
+    final thr = tamperedThreshold;
+    if (thr != null && n == 2 && labels[1] == 'tampered') {
+      final pt = probs[1].clamp(0.0, 1.0);
+      final isTampered = pt >= thr;
+      return PortraitPrediction(
+        label: isTampered ? 'tampered' : 'genuine',
+        confidence: isTampered ? pt : 0.6 + 0.4 * (thr - pt) / thr,
+        probabilities: {for (var i = 0; i < n; i++) labels[i]: probs[i]},
+      );
     }
     // Step 4: pick the class with the highest probability.
     var best = 0;

@@ -727,10 +727,26 @@ class PortraitResultModel {
     this.confidence = 0,
     this.verified = false,
     this.knownDenominations = const [],
+    this.faceAvailable = false,
+    this.faceLabel,
+    this.faceConfidence = 0,
+    this.faceVerified = false,
   });
 
   /// A "model not installed" result: no label, no confidence.
   const PortraitResultModel.notInstalled() : this(modelAvailable: false);
+
+  /// True when the face-level model is installed.
+  final bool faceAvailable;
+
+  /// Face model class: 'genuine' (the real Quaid-e-Azam portrait) or 'tampered'.
+  final String? faceLabel;
+
+  /// Confidence of [faceLabel], 0..1.
+  final double faceConfidence;
+
+  /// True when the face model passed its held-out accuracy check.
+  final bool faceVerified;
 
   /// False when the portrait model file is not in the app.
   final bool modelAvailable;
@@ -765,6 +781,10 @@ class PortraitResultModel {
           for (final v in (json['known_denominations'] as List? ?? const []))
             if (_i(v) != null) _i(v)!,
         ],
+        faceAvailable: json['face_available'] == true,
+        faceLabel: json['face_label'] as String?,
+        faceConfidence: _d(json['face_confidence']),
+        faceVerified: json['face_verified'] == true,
       );
 
   /// Converts to JSON.
@@ -774,5 +794,9 @@ class PortraitResultModel {
         'confidence': confidence,
         'verified': verified,
         'known_denominations': knownDenominations,
+        'face_available': faceAvailable,
+        'face_label': faceLabel,
+        'face_confidence': faceConfidence,
+        'face_verified': faceVerified,
       };
 }

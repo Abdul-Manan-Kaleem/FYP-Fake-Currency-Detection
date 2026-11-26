@@ -1,0 +1,52 @@
+{
+  "verified": true,
+  "classes": [
+    "genuine",
+    "tampered"
+  ],
+  "preprocess": "letterbox",
+  "size": 320,
+  "tampered_threshold": 0.5,
+  "auc": 0.9813,
+  "input": "float32 [1,320,320,3], whole front photo letterboxed on grey 114, x/127.5-1",
+  "held_out": {
+    "accuracy": 0.8751,
+    "genuine_kept": 0.9962,
+    "tampered_caught": 0.8423,
+    "per_kind": {
+      "genuine": {
+        "test_samples": 261,
+        "correct": 0.9962
+      },
+      "A": {
+        "test_samples": 221,
+        "correct": 0.8824
+      },
+      "B": {
+        "test_samples": 221,
+        "correct": 0.9321
+      },
+      "C": {
+        "test_samples": 261,
+        "correct": 0.7931
+      },
+      "D": {
+        "test_samples": 261,
+        "correct": 0.7816
+      }
+    },
+    "confusion": [
+      [
+        260,
+        1
+      ],
+      [
+        152,
+        812
+      ]
+    ]
+  },
+  "train_samples": 3528,
+  "test_samples": 1225,
+  "trained_at": "2026-11-27T00:27:32"
+}
